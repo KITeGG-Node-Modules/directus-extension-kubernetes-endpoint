@@ -1,5 +1,5 @@
 {
-	"name": "directus-extension-kitegg-kubernetes-endpoint",
+	"name": "directus-extension-kubernetes-endpoint",
 	"description": "Please enter a description for your extension",
 	"icon": "extension",
 	"version": "1.0.0",
@@ -24,6 +24,7 @@
 		"@directus/extensions-sdk": "10.3.4"
 	},
 	"dependencies": {
-		"@kubernetes/client-node": "^0.20.0"
+		"@kubernetes/client-node": "^0.20.0",
+		"kitegg-directus-extension-common": "github:KITeGG-Node-Modules/kitegg-directus-extension-common"
 	}
 }
