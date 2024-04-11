@@ -108,7 +108,6 @@ export default {
       try {
         const appsClient = getKubernetesClient('services', k8s.AppsV1Api)
         const coreClient = getKubernetesClient('services')
-        const { body:statefulSet } = await appsClient.readNamespacedStatefulSet(statefulSetName, 'services')
         const { body:podsBody } = await coreClient.listNamespacedPod('services', undefined, undefined, undefined, undefined, `app=${statefulSetName}`)
         const { items:pods } = podsBody
         await appsClient.deleteNamespacedStatefulSet(statefulSetName, 'services', undefined, undefined, undefined, undefined, 'Background')
