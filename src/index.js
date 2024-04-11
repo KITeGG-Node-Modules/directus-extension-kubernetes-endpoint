@@ -10,14 +10,17 @@ import { makeService } from './make-service.js'
 export default {
 	id: 'kubernetes',
 	handler: (router, context) => {
-    function getDeploymentName (user, name) {
-      const nameSlug = slugify(name, {
+    function getNameSlug (name) {
+      return slugify(name, {
         replacement: '-',
         lower: true,
         strict: true,
         trim: true
       })
-      return `user-${user.id}-${nameSlug}`
+    }
+    function getDeploymentName (user, name) {
+      const nameSlug = getNameSlug(name)
+      return `sd-${nameSlug}`
     }
     router.get('/capacity', baseRequestHandler(async () => {
       const workers = await getWorkers()
@@ -49,7 +52,7 @@ export default {
       if (!dockerService) {
         return res.status(404).send('No such docker service found')
       }
-      const statefulSetName = getDeploymentName(user, dockerService.name)
+      const statefulSetName = getDeploymentName(user, dockerService.id)
       try {
         const appsClient = getKubernetesClient('services', k8s.AppsV1Api)
         const coreClient = getKubernetesClient('services')
@@ -93,7 +96,7 @@ export default {
       }
     }, context))
 
-    router.post('/services/:id/deploy', baseRequestHandler(async (ctx) => {
+    router.delete('/services/:id', baseRequestHandler(async (ctx) => {
       const {req, res, user, services} = ctx
       const {ItemsService} = services
       const itemsService = new ItemsService('docker_services', {schema: req.schema, accountability: req.accountability})
@@ -101,7 +104,47 @@ export default {
       if (!dockerService) {
         return res.status(404).send('No such docker service found')
       }
-      const statefulSetName = getDeploymentName(user, dockerService.name)
+      const statefulSetName = getDeploymentName(user, dockerService.id)
+      try {
+        const appsClient = getKubernetesClient('services', k8s.AppsV1Api)
+        const coreClient = getKubernetesClient('services')
+        const { body:statefulSet } = await appsClient.readNamespacedStatefulSet(statefulSetName, 'services')
+        const { body:podsBody } = await coreClient.listNamespacedPod('services', undefined, undefined, undefined, undefined, `app=${statefulSetName}`)
+        const { items:pods } = podsBody
+        await appsClient.deleteNamespacedStatefulSet(statefulSetName, 'services', undefined, undefined, undefined, undefined, 'Background')
+        for (const pod of pods) {
+          for (const containerStatus of pod.status.containerStatuses) {
+            const serviceName = `${statefulSetName}-${containerStatus.name}`
+            await coreClient.deleteNamespacedService(serviceName, 'services', undefined, undefined, undefined, undefined, 'Background')
+          }
+        }
+        const { body:volumeClaimsBody } = await coreClient.listNamespacedPersistentVolumeClaim('services', undefined, undefined, undefined, undefined, `app=${statefulSetName}`)
+        const { items:volumeClaims } = volumeClaimsBody
+        for (const claim of volumeClaims) {
+          await coreClient.deleteNamespacedPersistentVolumeClaim(claim.metadata.name, 'services', undefined, undefined, undefined, undefined, 'Background')
+        }
+        return { deleted: dockerService.id }
+      }
+      catch (err) {
+        if (err.body) {
+          res.status(err.body.code)
+          return err.body.message
+        }
+        console.error(err)
+        res.status(500)
+        return err.message
+      }
+    }, context))
+
+    router.put('/services/:id/deploy', baseRequestHandler(async (ctx) => {
+      const {req, res, user, services} = ctx
+      const {ItemsService} = services
+      const itemsService = new ItemsService('docker_services', {schema: req.schema, accountability: req.accountability})
+      const dockerService = await itemsService.readOne(req.params.id)
+      if (!dockerService) {
+        return res.status(404).send('No such docker service found')
+      }
+      const statefulSetName = getDeploymentName(user, dockerService.id)
 
       const deployment = parse(dockerService.deployment)
       if (deployment) {
