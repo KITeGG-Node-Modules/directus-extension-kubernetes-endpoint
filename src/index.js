@@ -10,6 +10,15 @@ import { makeService } from './make-service.js'
 export default {
 	id: 'kubernetes',
 	handler: (router, context) => {
+    function getDeploymentName (user, name) {
+      const nameSlug = slugify(name, {
+        replacement: '-',
+        lower: true,
+        strict: true,
+        trim: true
+      })
+      return `user-${user.id}-${nameSlug}`
+    }
     router.get('/capacity', baseRequestHandler(async () => {
       const workers = await getWorkers()
       const results = []
@@ -32,8 +41,56 @@ export default {
       return results
     }, context))
 
-    router.get('/services', baseRequestHandler(async (ctx) => {
+    router.get('/services/:id', baseRequestHandler(async (ctx) => {
       const {req, res, user, services} = ctx
+      const {ItemsService} = services
+      const itemsService = new ItemsService('docker_services', {schema: req.schema, accountability: req.accountability})
+      const dockerService = await itemsService.readOne(req.params.id)
+      if (!dockerService) {
+        return res.status(404).send('No such docker service found')
+      }
+      const statefulSetName = getDeploymentName(user, dockerService.name)
+      try {
+        const appsClient = getKubernetesClient('services', k8s.AppsV1Api)
+        const coreClient = getKubernetesClient('services')
+        const { body:statefulSet } = await appsClient.readNamespacedStatefulSet(statefulSetName, 'services')
+        const { body:podsBody } = await coreClient.listNamespacedPod('services', undefined, undefined, undefined, undefined, `app=${statefulSetName}`)
+        const { items:pods } = podsBody
+        const { body:volumeClaimsBody } = await coreClient.listNamespacedPersistentVolumeClaim('services', undefined, undefined, undefined, undefined, `app=${statefulSetName}`)
+        const { items:volumeClaims } = volumeClaimsBody
+        return {
+          replicas: statefulSet.status.replicas,
+          currentReplicas: statefulSet.status.currentReplicas,
+          pods: pods.map(pod => {
+            return {
+              phase: pod.status.phase,
+              containers: pod.status.containerStatuses.map(container => {
+                return {
+                  name: container.name,
+                  ready: container.ready,
+                  started: container.started
+                }
+              })
+            }
+          }),
+          volumes: volumeClaims.map(vc => {
+            return {
+              name: vc.metadata.name,
+              phase: vc.status.phase,
+              capacity: vc.status.capacity?.storage
+            }
+          })
+        }
+      }
+      catch (err) {
+        if (err.body) {
+          res.status(err.body.code)
+          return err.body.message
+        }
+        console.error(err)
+        res.status(500)
+        return err.message
+      }
     }, context))
 
     router.post('/services/:id/deploy', baseRequestHandler(async (ctx) => {
@@ -41,6 +98,11 @@ export default {
       const {ItemsService} = services
       const itemsService = new ItemsService('docker_services', {schema: req.schema, accountability: req.accountability})
       const dockerService = await itemsService.readOne(req.params.id)
+      if (!dockerService) {
+        return res.status(404).send('No such docker service found')
+      }
+      const statefulSetName = getDeploymentName(user, dockerService.name)
+
       const deployment = parse(dockerService.deployment)
       if (deployment) {
         const validationErrors = validateDeployment(deployment)
@@ -48,14 +110,6 @@ export default {
           res.status(400)
           return validationErrors
         }
-
-        const nameSlug = slugify(dockerService.name, {
-          replacement: '-',
-          lower: true,
-          strict: true,
-          trim: true
-        })
-        const statefulSetName = `user-${user.id}-${nameSlug}`
         const { statefulSet, servicePayloads } = makeStatefulSet(statefulSetName, deployment)
         try {
           const client = getKubernetesClient('services', k8s.AppsV1Api)
