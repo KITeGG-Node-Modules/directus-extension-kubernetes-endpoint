@@ -36,9 +36,6 @@ export function validateDeployment (deployment) {
       volumeMounts: {
         type: 'array'
       },
-      expose: {
-        type: 'boolean'
-      },
       gpu: {
         type: 'string',
         inclusion: gpuProfiles
