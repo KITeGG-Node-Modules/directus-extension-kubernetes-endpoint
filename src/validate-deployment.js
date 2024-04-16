@@ -60,6 +60,22 @@ export function validateDeployment (deployment) {
       if (portErrors) validationErrors = validationErrors.concat(portErrors)
     }
 
+    if (container.environment) {
+      for (const envVar of container.environment) {
+        const envVarErrors = validate(envVar, {
+          name: {
+            presence: true,
+            type: 'string'
+          },
+          value: {
+            presence: true,
+            type: 'string'
+          }
+        })
+        if (envVarErrors) validationErrors = validationErrors.concat(envVarErrors)
+      }
+    }
+
     if (container.volumeMounts) {
       for (const volumeMount of container.volumeMounts) {
         const volumeMountErrors = validate(volumeMount, {

@@ -46,7 +46,7 @@ export function makeStatefulSet (name, deployment) {
     })
     servicePayloads.push({ name: c.name, ports: c.ports })
 
-    container.env = (c.env || []).map((e => {
+    container.env = (c.environment || []).map((e => {
       const envVar = new k8s.V1EnvVar()
       envVar.name = e.name
       envVar.value = e.value
