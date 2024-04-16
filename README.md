@@ -86,6 +86,7 @@ This request returns an object in this format:
   "currentReplicas": 1,
   "pods": [
     {
+      "name": "asdf-1234",
       "phase": "Pending",
       "containers": [
         {
@@ -112,4 +113,22 @@ To delete a deployment and all associated resources:
 
 ```
 DELETE /kubernetes/deployments/<service ID>
+```
+
+### Getting logs for a deployment's pod
+
+To return a Pod's log:
+
+```
+GET /kubernetes/deployments/<service ID>/logs/<pod name>
+```
+
+The pod name can be taken from the `pods.name` property of the deployment status.
+
+Optionally, additional settings can be appended as query parameters:
+
+```
+container=<container name>    # If multiple containers are running in the pod
+sinceSeconds=123              # Only fetch logs reaching back N seconds
+previous=true                 # Get the logs for the previous crashed or killed pod
 ```
