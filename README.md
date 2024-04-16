@@ -6,14 +6,14 @@
 
 ### Deploying a service
 
-First, the service needs to be created in the collection `docker_services` in the LLP API.
+First, the service needs to be created in the collection `deployments` in the LLP API.
 
 The required payload for the service is:
 
 ```json
 {
-  "name": "My NGINX Service",
-  "deployment": "... valid YAML document (see below) ...",
+  "title": "My NGINX Service",
+  "data": "... valid YAML document (see below) ...",
   "exposed_service": "nginx",
   "exposed_port": 80
 }

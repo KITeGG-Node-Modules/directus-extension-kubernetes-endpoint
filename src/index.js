@@ -44,15 +44,15 @@ export default {
       return results
     }, context))
 
-    router.get('/services/:id', baseRequestHandler(async (ctx) => {
+    router.get('/deployments/:id', baseRequestHandler(async (ctx) => {
       const {req, res, user, services} = ctx
       const {ItemsService} = services
-      const itemsService = new ItemsService('docker_services', {schema: req.schema, accountability: req.accountability})
-      const dockerService = await itemsService.readOne(req.params.id)
-      if (!dockerService) {
-        return res.status(404).send('No such docker service found')
+      const deploymentsService = new ItemsService('deployments', {schema: req.schema, accountability: req.accountability})
+      const deployment = await deploymentsService.readOne(req.params.id)
+      if (!deployment) {
+        return res.status(404).send('No such deployment found')
       }
-      const statefulSetName = getDeploymentName(user, dockerService.id)
+      const statefulSetName = getDeploymentName(user, deployment.id)
       try {
         const appsClient = getKubernetesClient('services', k8s.AppsV1Api)
         const coreClient = getKubernetesClient('services')
@@ -96,15 +96,15 @@ export default {
       }
     }, context))
 
-    router.delete('/services/:id', baseRequestHandler(async (ctx) => {
+    router.delete('/deployments/:id', baseRequestHandler(async (ctx) => {
       const {req, res, user, services} = ctx
       const {ItemsService} = services
-      const itemsService = new ItemsService('docker_services', {schema: req.schema, accountability: req.accountability})
-      const dockerService = await itemsService.readOne(req.params.id)
-      if (!dockerService) {
-        return res.status(404).send('No such docker service found')
+      const deploymentsService = new ItemsService('deployments', {schema: req.schema, accountability: req.accountability})
+      const deployment = await deploymentsService.readOne(req.params.id)
+      if (!deployment) {
+        return res.status(404).send('No such deployment found')
       }
-      const statefulSetName = getDeploymentName(user, dockerService.id)
+      const statefulSetName = getDeploymentName(user, deployment.id)
       try {
         const appsClient = getKubernetesClient('services', k8s.AppsV1Api)
         const coreClient = getKubernetesClient('services')
@@ -122,7 +122,7 @@ export default {
         for (const claim of volumeClaims) {
           await coreClient.deleteNamespacedPersistentVolumeClaim(claim.metadata.name, 'services', undefined, undefined, undefined, undefined, 'Background')
         }
-        return { deleted: dockerService.id }
+        return { deleted: deployment.id }
       }
       catch (err) {
         if (err.body) {
@@ -135,24 +135,24 @@ export default {
       }
     }, context))
 
-    router.put('/services/:id/deploy', baseRequestHandler(async (ctx) => {
+    router.put('/deployments/:id', baseRequestHandler(async (ctx) => {
       const {req, res, user, services} = ctx
       const {ItemsService} = services
-      const itemsService = new ItemsService('docker_services', {schema: req.schema, accountability: req.accountability})
-      const dockerService = await itemsService.readOne(req.params.id)
-      if (!dockerService) {
-        return res.status(404).send('No such docker service found')
+      const deploymentsService = new ItemsService('deployments', {schema: req.schema, accountability: req.accountability})
+      const deployment = await deploymentsService.readOne(req.params.id)
+      if (!deployment) {
+        return res.status(404).send('No such deployment found')
       }
-      const statefulSetName = getDeploymentName(user, dockerService.id)
+      const statefulSetName = getDeploymentName(user, deployment.id)
 
-      const deployment = parse(dockerService.deployment)
-      if (deployment) {
-        const validationErrors = validateDeployment(deployment)
+      const deploymentData = parse(deployment.data)
+      if (deploymentData) {
+        const validationErrors = validateDeployment(deploymentData)
         if (validationErrors) {
           res.status(400)
           return validationErrors
         }
-        const { statefulSet, servicePayloads } = makeStatefulSet(statefulSetName, deployment)
+        const { statefulSet, servicePayloads } = makeStatefulSet(statefulSetName, deploymentData)
         try {
           const client = getKubernetesClient('services', k8s.AppsV1Api)
           const { body: existing } = await client.listNamespacedStatefulSet('services', undefined, undefined, undefined, `metadata.name=${statefulSetName}`)
@@ -197,7 +197,7 @@ export default {
           }
         }
 
-        return deployment
+        return deploymentData
       }
       res.status(404)
       return {message: 'api_errors.not_found'}
