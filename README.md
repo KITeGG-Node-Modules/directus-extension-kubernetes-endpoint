@@ -15,11 +15,13 @@ The required payload for the service is:
   "title": "My NGINX Service",
   "data": "... valid YAML document (see below) ...",
   "exposed_service": "nginx",
-  "exposed_port": 80
+  "exposed_port": 80,
+  "exposed_hostname": "my-nginx-service"
 }
 ```
 
-The values for `exposed_service` and `exposed_port` are optional and refer to the values in the YAML below.
+The values for `exposed_service`, `exposed_port` and `exposed_hostname` (must be a unique, alphanumeric string allowing
+only a dash as a special character) are optional and refer to the values in the YAML below.
 
 The YAML describing the deployment is structured as follows:
 
