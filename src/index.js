@@ -66,6 +66,7 @@ export default {
           currentReplicas: statefulSet.status.currentReplicas,
           pods: pods.map(pod => {
             return {
+              name: pod.metadata.name,
               phase: pod.status.phase,
               containers: pod.status.containerStatuses.map(container => {
                 return {
