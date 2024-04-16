@@ -61,7 +61,7 @@ nvidia.com/mig-3g.40gb
 After this has been successfully saved, the service can now be deployed with:
 
 ```
-PUT /kubernetes/services/<service ID>/deploy
+PUT /kubernetes/deployments/<service ID>
 ```
 
 This should either return the deployment spec as JSON, or an error code with failed validation or other errors. To update
@@ -73,7 +73,7 @@ After a successful deployment, the service takes a moment to pull images, create
 status by querying:
 
 ```
-GET /kubernetes/services/<service ID>
+GET /kubernetes/deployments/<service ID>
 ```
 
 This request returns an object in this format:
@@ -109,5 +109,5 @@ This request returns an object in this format:
 To delete a deployment and all associated resources:
 
 ```
-DELETE /kubernetes/services/<service ID>
+DELETE /kubernetes/deployments/<service ID>
 ```
