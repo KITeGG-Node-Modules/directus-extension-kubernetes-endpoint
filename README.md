@@ -49,6 +49,15 @@ volumes:
     size: 1Gi  # This can be anything between 1-999 Gi or Mi
 ```
 
+These are the possible values for `gpu`:
+
+```
+nvidia/gpu
+nvidia.com/mig-1g.10gb
+nvidia.com/mig-2g.20gb
+nvidia.com/mig-3g.40gb
+```
+
 After this has been successfully saved, the service can now be deployed with:
 
 ```
