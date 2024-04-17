@@ -132,3 +132,24 @@ container=<container name>    # If multiple containers are running in the pod
 sinceSeconds=123              # Only fetch logs reaching back N seconds
 previous=true                 # Get the logs for the previous crashed or killed pod
 ```
+
+### Getting events for a deployment's pod
+
+To request events regarding the status of the deployment, poll this endpoint path:
+
+``` 
+GET /kubernetes/deployments/<deployment ID>/events/<pod name>
+```
+
+An example output:
+
+```json
+[
+    {
+        "creationTimestamp": "2024-04-17T09:05:33.000Z",
+        "note": "0/8 nodes are available: 3 node(s) didn't match Pod's node affinity/selector, 5 Insufficient nvidia/gpu. preemption: 0/8 nodes are available: 3 Preemption is not helpful for scheduling, 5 No preemption victims found for incoming pod.",
+        "reason": "FailedScheduling",
+        "type": "Warning"
+    }
+]
+```

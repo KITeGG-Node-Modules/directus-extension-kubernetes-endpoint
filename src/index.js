@@ -98,7 +98,7 @@ export default {
     }, context))
 
     router.get('/deployments/:id/logs/:podName', baseRequestHandler(async (ctx) => {
-      const {req, res, user, services} = ctx
+      const {req, res, services} = ctx
       const {podName} = req.params
       if (!podName) {
         return res.status(400).send('Pod name missing')
@@ -115,6 +115,44 @@ export default {
         const { body } = await coreClient.readNamespacedPodLog(podName, 'services', req.query.container, false, undefined, undefined, undefined, !!req.query.previous, sinceSeconds)
         res.setHeader('content-type', 'text/plain')
         return body
+      }
+      catch (err) {
+        if (err.body) {
+          res.status(err.body.code)
+          return err.body.message
+        }
+        console.error(err)
+        res.status(500)
+        return err.message
+      }
+    }, context))
+
+    router.get('/deployments/:id/events/:podName', baseRequestHandler(async (ctx) => {
+      const {req, res, services} = ctx
+      const {podName} = req.params
+      if (!podName) {
+        return res.status(400).send('Pod name missing')
+      }
+      const {ItemsService} = services
+      const deploymentsService = new ItemsService('deployments', {schema: req.schema, accountability: req.accountability})
+      const deployment = await deploymentsService.readOne(req.params.id)
+      if (!deployment) {
+        return res.status(404).send('No such deployment found')
+      }
+      try {
+        const eventsClient = getKubernetesClient('services', k8s.EventsV1Api)
+        const labelSelector = undefined // `statefulset.kubernetes.io/pod-name=${podName}`
+        const fieldSelector = `regarding.name=${podName}`
+        const { body } = await eventsClient.listNamespacedEvent('services', undefined, undefined, undefined, fieldSelector, labelSelector)
+        const { items } = body
+        return items.map(item => {
+          return {
+            creationTimestamp: item.metadata.creationTimestamp,
+            note: item.note,
+            reason: item.reason,
+            type: item.type
+          }
+        })
       }
       catch (err) {
         if (err.body) {
