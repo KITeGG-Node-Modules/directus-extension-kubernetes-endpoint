@@ -153,3 +153,13 @@ An example output:
     }
 ]
 ```
+
+### Delete a deployment's pod
+
+To delete a pod and its containers within a deployment, call:
+
+```
+DELETE /kubernetes/deployments/<deployment ID>/pods/<pod name>
+```
+
+Note that the pod will be deleted, but a new one will immediately be created. This can be used to restart a deployment's pod.

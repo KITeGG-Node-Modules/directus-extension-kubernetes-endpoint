@@ -204,6 +204,34 @@ export default {
       }
     }, context))
 
+    router.delete('/deployments/:id/pods/:podName', baseRequestHandler(async (ctx) => {
+      const {req, res, services} = ctx
+      const {podName} = req.params
+      if (!podName) {
+        return res.status(400).send('Pod name missing')
+      }
+      const {ItemsService} = services
+      const deploymentsService = new ItemsService('deployments', {schema: req.schema, accountability: req.accountability})
+      const deployment = await deploymentsService.readOne(req.params.id)
+      if (!deployment) {
+        return res.status(404).send('No such deployment found')
+      }
+      try {
+        const coreClient = getKubernetesClient('services')
+        await coreClient.deleteNamespacedPod(podName, 'services')
+        return { deleted: podName }
+      }
+      catch (err) {
+        if (err.body) {
+          res.status(err.body.code)
+          return err.body.message
+        }
+        console.error(err)
+        res.status(500)
+        return err.message
+      }
+    }, context))
+
     router.put('/deployments/:id', baseRequestHandler(async (ctx) => {
       const {req, res, user, services} = ctx
       const {ItemsService} = services
