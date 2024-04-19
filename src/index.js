@@ -272,7 +272,7 @@ export default {
 
         for (const payload of servicePayloads) {
           const serviceName = `${statefulSetName}-${payload.name}`
-          const service = makeService(serviceName, payload.ports)
+          const service = makeService(statefulSetName, serviceName, payload.ports)
 
           try {
             const client = getKubernetesClient('services')
