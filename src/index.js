@@ -68,7 +68,7 @@ export default {
             return {
               name: pod.metadata.name,
               phase: pod.status.phase,
-              containers: pod.status.containerStatuses.map(container => {
+              containers: (pod.status?.containerStatuses || []).map(container => {
                 return {
                   name: container.name,
                   ready: container.ready,
