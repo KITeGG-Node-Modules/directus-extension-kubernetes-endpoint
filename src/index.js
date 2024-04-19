@@ -64,7 +64,7 @@ export default {
         return {
           replicas: statefulSet.status.replicas,
           currentReplicas: statefulSet.status.currentReplicas,
-          pods: pods.map(pod => {
+          pods: (pods || []).map(pod => {
             return {
               name: pod.metadata.name,
               phase: pod.status.phase,
@@ -77,7 +77,7 @@ export default {
               })
             }
           }),
-          volumes: volumeClaims.map(vc => {
+          volumes: (volumeClaims || []).map(vc => {
             return {
               name: vc.metadata.name,
               phase: vc.status.phase,
@@ -145,7 +145,7 @@ export default {
         const fieldSelector = `regarding.name=${podName}`
         const { body } = await eventsClient.listNamespacedEvent('services', undefined, undefined, undefined, fieldSelector, labelSelector)
         const { items } = body
-        return items.map(item => {
+        return (items || []).map(item => {
           return {
             creationTimestamp: item.metadata.creationTimestamp,
             note: item.note,
