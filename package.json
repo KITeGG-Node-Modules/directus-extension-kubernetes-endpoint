@@ -18,10 +18,12 @@
 	"scripts": {
 		"build": "directus-extension build",
 		"dev": "directus-extension build -w --no-minify",
-		"link": "directus-extension link"
+		"link": "directus-extension link",
+		"format": "prettier -w src/"
 	},
 	"devDependencies": {
-		"@directus/extensions-sdk": "10.3.4"
+		"@directus/extensions-sdk": "10.3.4",
+		"prettier": "^3.2.5"
 	},
 	"dependencies": {
 		"@kubernetes/client-node": "0.18.1",
