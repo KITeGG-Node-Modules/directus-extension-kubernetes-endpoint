@@ -1,6 +1,6 @@
 import { getKubernetesClient } from 'kitegg-directus-extension-common'
 import k8s from '@kubernetes/client-node'
-import { getDeploymentName } from './util.js'
+import { getDeploymentName } from './lib/util.js'
 
 export async function deleteDeployment(user, deployment) {
   const statefulSetName = getDeploymentName(user, deployment.id)

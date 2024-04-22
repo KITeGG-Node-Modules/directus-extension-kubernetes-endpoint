@@ -33,10 +33,14 @@ export async function getDeploymentInfo(user, deployment) {
     replicas: statefulSet.status.replicas,
     currentReplicas: statefulSet.status.currentReplicas,
     pods: (pods || []).map((pod) => {
+      let { containerStatuses } = pod.status || {}
+      containerStatuses = Array.isArray(containerStatuses)
+        ? containerStatuses
+        : []
       return {
         name: pod.metadata.name,
-        phase: pod.status.phase,
-        containers: (pod.status?.containerStatuses || []).map((container) => {
+        phase: pod.status?.phase,
+        containers: containerStatuses.map((container) => {
           return {
             name: container.name,
             ready: container.ready,
@@ -48,8 +52,8 @@ export async function getDeploymentInfo(user, deployment) {
     volumes: (volumeClaims || []).map((vc) => {
       return {
         name: vc.metadata.name,
-        phase: vc.status.phase,
-        capacity: vc.status.capacity?.storage,
+        phase: vc.status?.phase,
+        capacity: vc.status?.capacity?.storage,
       }
     }),
   }

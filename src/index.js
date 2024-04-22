@@ -8,11 +8,11 @@ import { makeStatefulSet } from './lib/make-stateful-set.js'
 import { makeService } from './lib/make-service.js'
 import { getClusterCapacity } from './get-cluster-capacity.js'
 import { getDeploymentInfo } from './get-deployment-info.js'
-import { getPodEvents } from './lib/get-pod-events.js'
-import { deleteDeployment } from './lib/delete-deployment.js'
-import { createStatefulSet } from './lib/create-stateful-set.js'
+import { getPodEvents } from './get-pod-events.js'
+import { deleteDeployment } from './delete-deployment.js'
+import { createStatefulSet } from './create-stateful-set.js'
 import { getDeploymentName } from './lib/util.js'
-import { createService } from './lib/create-service.js'
+import { createService } from './create-service.js'
 
 export default {
   id: 'kubernetes',

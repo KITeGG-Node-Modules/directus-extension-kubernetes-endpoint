@@ -1,4 +1,4 @@
-import { getWorkers } from './lib/get-workers.js'
+import { getWorkers } from './get-workers.js'
 
 export async function getClusterCapacity() {
   const workers = await getWorkers()
