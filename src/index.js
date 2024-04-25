@@ -233,7 +233,7 @@ export default {
               payload.ports
             )
             try {
-              await createService(res, serviceName, service)
+              await createService(res, service, serviceName)
             } catch (err) {
               if (err.body) {
                 res.status(err.body.code)
