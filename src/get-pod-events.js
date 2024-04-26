@@ -10,8 +10,8 @@ export async function getPodEvents(podName) {
     undefined,
     undefined,
     undefined,
-    fieldSelector,
-    labelSelector
+    fieldSelector
+    // labelSelector
   )
   const { items } = body
   return (items || []).map((item) => {
