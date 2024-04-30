@@ -1,11 +1,12 @@
 import k8s from '@kubernetes/client-node'
+import { servicesNamespace } from './config.js'
 
 export function makeStatefulSet(name, deployment) {
   const servicePayloads = []
 
   const metadata = new k8s.V1ObjectMeta()
   metadata.name = name
-  metadata.namespace = 'services'
+  metadata.namespace = servicesNamespace
   const statefulSet = new k8s.V1StatefulSet()
   statefulSet.metadata = metadata
   const spec = new k8s.V1StatefulSetSpec()

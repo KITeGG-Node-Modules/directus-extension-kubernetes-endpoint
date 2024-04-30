@@ -1,17 +1,18 @@
 import { getKubernetesClient } from 'kitegg-directus-extension-common'
 import k8s from '@kubernetes/client-node'
 import { getDeploymentName } from './lib/util.js'
+import { servicesNamespace } from './lib/config.js'
 
 export async function getDeploymentInfo(user, deployment) {
   const statefulSetName = getDeploymentName(user, deployment.id)
-  const appsClient = getKubernetesClient('services', k8s.AppsV1Api)
-  const coreClient = getKubernetesClient('services')
+  const appsClient = getKubernetesClient(servicesNamespace, k8s.AppsV1Api)
+  const coreClient = getKubernetesClient(servicesNamespace)
   const { body: statefulSet } = await appsClient.readNamespacedStatefulSet(
     statefulSetName,
-    'services'
+    servicesNamespace
   )
   const { body: podsBody } = await coreClient.listNamespacedPod(
-    'services',
+    servicesNamespace,
     undefined,
     undefined,
     undefined,
@@ -21,7 +22,7 @@ export async function getDeploymentInfo(user, deployment) {
   const { items: pods } = podsBody
   const { body: volumeClaimsBody } =
     await coreClient.listNamespacedPersistentVolumeClaim(
-      'services',
+      servicesNamespace,
       undefined,
       undefined,
       undefined,

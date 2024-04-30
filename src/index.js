@@ -3,6 +3,7 @@ import {
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
 import { parse } from 'yaml'
+import { servicesNamespace } from './lib/config.js'
 import { validateDeployment } from './lib/validate-deployment.js'
 import { makeStatefulSet } from './lib/make-stateful-set.js'
 import { makeService } from './lib/make-service.js'
@@ -67,13 +68,13 @@ export default {
           return res.status(404).send('No such deployment found')
         }
         try {
-          const coreClient = getKubernetesClient('services')
+          const coreClient = getKubernetesClient(servicesNamespace)
           const sinceSeconds = req.query.sinceSeconds
             ? parseInt(req.query.sinceSeconds)
             : undefined
           const { body } = await coreClient.readNamespacedPodLog(
             podName,
-            'services',
+            servicesNamespace,
             req.query.container,
             false,
             undefined,
@@ -173,8 +174,8 @@ export default {
           return res.status(404).send('No such deployment found')
         }
         try {
-          const coreClient = getKubernetesClient('services')
-          await coreClient.deleteNamespacedPod(podName, 'services')
+          const coreClient = getKubernetesClient(servicesNamespace)
+          await coreClient.deleteNamespacedPod(podName, servicesNamespace)
           return { deleted: podName }
         } catch (err) {
           if (err.body) {

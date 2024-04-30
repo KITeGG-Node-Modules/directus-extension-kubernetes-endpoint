@@ -1,12 +1,13 @@
 import { getKubernetesClient } from 'kitegg-directus-extension-common'
 import k8s from '@kubernetes/client-node'
+import { servicesNamespace } from './lib/config.js'
 
 export async function getPodEvents(podName) {
-  const eventsClient = getKubernetesClient('services', k8s.EventsV1Api)
+  const eventsClient = getKubernetesClient(servicesNamespace, k8s.EventsV1Api)
   // const labelSelector = `statefulset.kubernetes.io/pod-name=${podName}`
   const fieldSelector = `regarding.name=${podName}`
   const { body } = await eventsClient.listNamespacedEvent(
-    'services',
+    servicesNamespace,
     undefined,
     undefined,
     undefined,
