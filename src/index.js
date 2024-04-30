@@ -37,7 +37,8 @@ export default {
           return res.status(404).send('No such deployment found')
         }
         try {
-          return getDeploymentInfo(user, deployment)
+          const results = await getDeploymentInfo(user, deployment)
+          return results
         } catch (err) {
           if (err.body) {
             res.status(err.body.code)
