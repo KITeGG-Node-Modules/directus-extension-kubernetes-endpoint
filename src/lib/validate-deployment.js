@@ -25,9 +25,10 @@ export function validateDeployment(deployment) {
         presence: true,
         type: 'string',
         format: {
-          pattern: '[a-z0-9]([-a-z0-9]*[a-z0-9])?',
+          pattern:
+            '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*',
           message:
-            'of container must be a lowercase RFC1123 hostname (a-z,0-9,-)',
+            'of container must be a lowercase RFC1123 hostname (a-z,0-9,-,.)',
         },
       },
       image: {
@@ -89,7 +90,8 @@ export function validateDeployment(deployment) {
             presence: true,
             type: 'string',
             format: {
-              pattern: '[a-z0-9]([-a-z0-9]*[a-z0-9])?',
+              pattern:
+                '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*',
               message:
                 'of volume mount must be a lowercase RFC1123 hostname (a-z,0-9,-,.)',
             },
@@ -123,7 +125,8 @@ export function validateDeployment(deployment) {
             presence: true,
             type: 'string',
             format: {
-              pattern: '[a-z0-9]([-a-z0-9]*[a-z0-9])?',
+              pattern:
+                '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*',
               message:
                 'of volume must be a lowercase RFC1123 hostname (a-z,0-9,-,.)',
             },
