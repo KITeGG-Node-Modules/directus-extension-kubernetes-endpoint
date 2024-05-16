@@ -47,7 +47,7 @@ export function validateDeployment(deployment) {
         inclusion: gpuProfiles,
       },
       command: {
-        type: 'string',
+        type: 'array',
       },
       args: {
         type: 'array',
