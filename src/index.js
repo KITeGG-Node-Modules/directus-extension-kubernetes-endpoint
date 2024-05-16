@@ -204,7 +204,15 @@ export default {
           return res.status(404).send('No such deployment found')
         }
         const statefulSetName = getDeploymentName(user, deployment.id)
-        const deploymentData = parse(deployment.data)
+        let deploymentData
+        try {
+          deploymentData = parse(deployment.data)
+        } catch (err) {
+          res.status(400)
+          return {
+            errors: [{ data: err.message }],
+          }
+        }
         if (deploymentData) {
           const validationErrors = validateDeployment(deploymentData)
           if (validationErrors) {
