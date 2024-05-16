@@ -32,6 +32,8 @@ export function makeStatefulSet(name, deployment) {
     const container = new k8s.V1Container()
     container.name = c.name
     container.image = c.image
+    container.command = c.command
+    container.args = c.args
     container.imagePullPolicy = 'Always'
     if (c.gpu) {
       container.resources = new k8s.V1ResourceRequirements()

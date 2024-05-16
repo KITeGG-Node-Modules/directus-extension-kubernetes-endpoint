@@ -35,6 +35,8 @@ containers:
         port: 80
     # Optional fields
     gpu: 'nvidia/gpu'  # Request a GPU resource (see below for valid options)
+    command: '/bin/echo', # Override the container's command
+    args: ['asdf', 'hello'], # Supply arguments to the container's command
     environment:
       - name: MY_ENV_VAR
         value: "asdf"

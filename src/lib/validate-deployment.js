@@ -46,6 +46,12 @@ export function validateDeployment(deployment) {
         type: 'string',
         inclusion: gpuProfiles,
       },
+      command: {
+        type: 'string',
+      },
+      args: {
+        type: 'array',
+      },
     })
     if (containerErrors) {
       validationErrors = validationErrors.concat(containerErrors)
