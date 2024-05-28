@@ -46,6 +46,15 @@ export function validateDeployment(deployment) {
         type: 'string',
         inclusion: gpuProfiles,
       },
+      gpuCount: {
+        type: 'integer',
+        numericality: {
+          strict: true,
+          noStrings: true,
+          onlyInteger: true,
+          lessThanOrEqualTo: 2,
+        },
+      },
       command: {
         type: 'array',
       },
@@ -66,7 +75,13 @@ export function validateDeployment(deployment) {
         },
         port: {
           presence: true,
-          type: 'number',
+          type: 'integer',
+          numericality: {
+            strict: true,
+            noStrings: true,
+            onlyInteger: true,
+            greaterThan: 0,
+          },
         },
       })
       if (portErrors) validationErrors = validationErrors.concat(portErrors)

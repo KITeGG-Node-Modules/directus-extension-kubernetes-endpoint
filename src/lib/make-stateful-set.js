@@ -38,7 +38,7 @@ export function makeStatefulSet(name, deployment) {
     if (c.gpu) {
       container.resources = new k8s.V1ResourceRequirements()
       container.resources.limits = {
-        [c.gpu]: 1,
+        [c.gpu]: c.gpuCount || 1,
       }
     }
     container.ports = (c.ports || []).map((p) => {
