@@ -34,7 +34,7 @@ containers:
       - name: default
         port: 80
     # Optional fields
-    gpu: 'nvidia/gpu'  # Request a GPU resource (see below for valid options)
+    gpu: 'nvidia.com/gpu'  # Request a GPU resource (see below for valid options)
     command: '/bin/echo', # Override the container's command
     args: ['asdf', 'hello'], # Supply arguments to the container's command
     environment:
@@ -56,7 +56,7 @@ volumes:
 These are the possible values for `gpu`:
 
 ```
-nvidia/gpu
+nvidia.com/gpu
 nvidia.com/mig-1g.10gb
 nvidia.com/mig-2g.20gb
 nvidia.com/mig-3g.40gb

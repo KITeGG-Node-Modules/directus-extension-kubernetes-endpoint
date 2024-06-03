@@ -14,7 +14,7 @@ export function validateDeployment(deployment) {
   }
 
   const gpuProfiles = [
-    'nvidia/gpu',
+    'nvidia.com/gpu',
     'nvidia.com/mig-1g.10gb',
     'nvidia.com/mig-2g.20gb',
     'nvidia.com/mig-3g.40gb',
