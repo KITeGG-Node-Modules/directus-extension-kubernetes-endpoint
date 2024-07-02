@@ -120,6 +120,10 @@ export function validateDeployment(deployment) {
           mountPath: {
             presence: true,
             type: 'string',
+            format: {
+              pattern: '^\\/.*',
+              message: 'must be an absolute path.',
+            },
           },
           readOnly: {
             type: 'boolean',
