@@ -112,6 +112,16 @@ This request returns an object in this format:
 }
 ```
 
+### Scaling (stopping) a deployment
+
+To change the scale of a deployment at runtime, call this endpoint:
+
+```
+PATCH /kubernetes/deployments/<service ID>?scale=<0-16>
+```
+
+Note: Using `0` is equivalent to stopping the deployment without removing resources.
+
 ### Deleting a deployment
 
 To delete a deployment and all associated resources:

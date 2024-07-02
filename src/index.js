@@ -14,6 +14,7 @@ import { deleteDeployment } from './delete-deployment.js'
 import { createStatefulSet } from './create-stateful-set.js'
 import { getDeploymentName } from './lib/util.js'
 import { createService } from './create-service.js'
+import k8s from '@kubernetes/client-node'
 
 export default {
   id: 'kubernetes',
@@ -117,6 +118,60 @@ export default {
         }
         try {
           return getPodEvents(podName)
+        } catch (err) {
+          if (err.body) {
+            res.status(err.body.code)
+            return err.body.message
+          }
+          console.error(err)
+          res.status(500)
+          return err.message
+        }
+      }, context)
+    )
+
+    router.patch(
+      '/deployments/:id',
+      baseRequestHandler(async (ctx) => {
+        const { req, res, services } = ctx
+        const { scale } = req.params
+        if (!podName) {
+          return res.status(400).send('Pod name missing')
+        }
+        const { ItemsService } = services
+        const deploymentsService = new ItemsService('deployments', {
+          schema: req.schema,
+          accountability: req.accountability,
+        })
+        const deployment = await deploymentsService.readOne(req.params.id)
+        if (!deployment) {
+          return res.status(404).send('No such deployment found')
+        }
+        try {
+          const statefulSetName = getDeploymentName(user, deployment.id)
+          const client = getKubernetesClient(servicesNamespace, k8s.AppsV1Api)
+          if (typeof scale !== 'undefined') {
+            const { body: existing } = await client.listNamespacedStatefulSet(
+              servicesNamespace,
+              undefined,
+              undefined,
+              undefined,
+              `metadata.name=${statefulSetName}`
+            )
+            if (existing.items.length === 1) {
+              const scalePayload = new k8s.V1Scale()
+              scalePayload.spec.replicas = parseInt(scale)
+              await client.patchNamespacedStatefulSetScale(
+                statefulSetName,
+                servicesNamespace,
+                scalePayload
+              )
+              return true
+            } else {
+              return res.status(404).send('No such deployment found')
+            }
+          }
+          return res.status(400).send('Bad request')
         } catch (err) {
           if (err.body) {
             res.status(err.body.code)
