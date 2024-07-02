@@ -61,6 +61,15 @@ export function validateDeployment(deployment) {
       args: {
         type: 'array',
       },
+      replicas: {
+        type: 'integer',
+        numericality: {
+          strict: true,
+          noStrings: true,
+          onlyInteger: true,
+          lessThanOrEqualTo: 16,
+        },
+      },
     })
     if (containerErrors) {
       validationErrors = validationErrors.concat(containerErrors)

@@ -40,13 +40,14 @@ containers:
     environment:
       - name: MY_ENV_VAR
         value: "asdf"
+    replicas: 1 # Allows scaling the service to multiple replicas (max. 16, with load-balancing)
     # Volume mounts are optional as you can also deploy without persistence
     volumeMounts:
       - name: mydata
         mountPath: /mydata
         # Optional volume params
         readOnly: true
-        type: 'ReadWriteOnce' # If used across replica or services, use 'ReadWriteMany'
+        type: 'ReadWriteOnce' # If used across replicas or services, use 'ReadWriteMany'
 
 # The volumes section is only mandatory if mounts are specified (name has to match)
 volumes:

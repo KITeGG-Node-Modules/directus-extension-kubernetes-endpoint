@@ -10,7 +10,7 @@ export function makeStatefulSet(name, deployment) {
   const statefulSet = new k8s.V1StatefulSet()
   statefulSet.metadata = metadata
   const spec = new k8s.V1StatefulSetSpec()
-  spec.replicas = 1
+  spec.replicas = deployment.replicas || 1
   spec.serviceName = name
   const selector = new k8s.V1LabelSelector()
   selector.matchLabels = {
