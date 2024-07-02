@@ -128,6 +128,10 @@ export function validateDeployment(deployment) {
           readOnly: {
             type: 'boolean',
           },
+          type: {
+            type: 'string',
+            inclusion: ['ReadWriteOnce', 'ReadWriteMany'],
+          },
         })
         if (volumeMountErrors)
           validationErrors = validationErrors.concat(volumeMountErrors)

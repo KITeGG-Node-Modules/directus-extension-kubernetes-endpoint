@@ -73,7 +73,7 @@ export function makeStatefulSet(name, deployment) {
     volumeClaim.metadata.name = v.name
     volumeClaim.spec = new k8s.V1PersistentVolumeClaimSpec()
     volumeClaim.spec.storageClassName = 'longhorn'
-    volumeClaim.spec.accessModes = ['ReadWriteOnce']
+    volumeClaim.spec.accessModes = [v.type || 'ReadWriteOnce']
     volumeClaim.spec.resources = new k8s.V1ResourceRequirements()
     volumeClaim.spec.resources.requests = {
       storage: v.size,

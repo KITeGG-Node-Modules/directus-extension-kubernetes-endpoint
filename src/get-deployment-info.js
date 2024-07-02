@@ -55,6 +55,9 @@ export async function getDeploymentInfo(user, deployment) {
         name: vc.metadata.name,
         phase: vc.status?.phase,
         capacity: vc.status?.capacity?.storage,
+        type: (vc.spec?.accessModes || []).find((e) =>
+          e.startsWith('ReadWrite')
+        ),
       }
     }),
   }

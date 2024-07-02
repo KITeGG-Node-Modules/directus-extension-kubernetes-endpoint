@@ -44,8 +44,9 @@ containers:
     volumeMounts:
       - name: mydata
         mountPath: /mydata
-        # This can optionally be set to read-only
+        # Optional volume params
         readOnly: true
+        type: 'ReadWriteOnce' # If used across replica or services, use 'ReadWriteMany'
 
 # The volumes section is only mandatory if mounts are specified (name has to match)
 volumes:
@@ -103,7 +104,8 @@ This request returns an object in this format:
     {
       "name": "mydata",
       "phase": "Bound",
-      "capacity": "1Gi"
+      "capacity": "1Gi",
+      "type": "ReadWriteOnce"
     }
   ]
 }
