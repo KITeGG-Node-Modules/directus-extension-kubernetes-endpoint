@@ -233,14 +233,19 @@ export default {
               const scalePayload = new k8s.V1Scale()
               scalePayload.spec = new k8s.V1ScaleSpec()
               scalePayload.spec.replicas = parseInt(scale)
+              const patch = [
+                {
+                  op: 'replace',
+                  path: '/spec',
+                  value: {
+                    replicas: parseInt(scale),
+                  },
+                },
+              ]
               await client.patchNamespacedStatefulSetScale(
                 statefulSetName,
                 servicesNamespace,
-                {
-                  spec: {
-                    replicas: parseInt(scale),
-                  },
-                }
+                patch
               )
               return true
             } else {
