@@ -83,7 +83,9 @@ export default {
             undefined,
             undefined,
             !!req.query.previous,
-            sinceSeconds
+            sinceSeconds,
+            undefined,
+            !!req.query.timestamps
           )
           res.setHeader('content-type', 'text/plain')
           return body

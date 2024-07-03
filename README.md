@@ -156,6 +156,7 @@ Optionally, additional settings can be appended as query parameters:
 container=<container name>    # If multiple containers are running in the pod
 sinceSeconds=123              # Only fetch logs reaching back N seconds
 previous=true                 # Get the logs for the previous crashed or killed pod
+timestamps=true               # Adds timestamps to the log lines
 ```
 
 ### Getting events for a deployment's pod
