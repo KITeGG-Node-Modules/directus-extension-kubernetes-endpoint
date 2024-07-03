@@ -35,6 +35,25 @@ export function makeStatefulSet(name, deployment) {
     container.command = c.command
     container.args = c.args
     container.imagePullPolicy = 'Always'
+    container.securityContext.allowPrivilegeEscalation = false
+
+    if (typeof c.user === 'number') {
+      container.securityContext.runAsUser = c.user
+    }
+    if (typeof c.group === 'number') {
+      container.securityContext.runAsGroup = c.group
+    }
+
+    if (c.fsUser) {
+      podSpec.securityContext.fsUser = c.fsUser
+    }
+    if (c.fsGroup) {
+      podSpec.securityContext.fsGroup = c.fsGroup
+    }
+    if (c.changeGroupOnMismatch) {
+      podSpec.securityContext.fsGroupChangePolicy = 'OnRootMismatch'
+    }
+
     if (c.gpu) {
       container.resources = new k8s.V1ResourceRequirements()
       container.resources.limits = {

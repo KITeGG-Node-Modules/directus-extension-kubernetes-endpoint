@@ -55,6 +55,38 @@ export function validateDeployment(deployment) {
           lessThanOrEqualTo: 2,
         },
       },
+      user: {
+        type: 'integer',
+        numericality: {
+          strict: true,
+          noStrings: true,
+          onlyInteger: true,
+        },
+      },
+      group: {
+        type: 'integer',
+        numericality: {
+          strict: true,
+          noStrings: true,
+          onlyInteger: true,
+        },
+      },
+      fsUser: {
+        type: 'integer',
+        numericality: {
+          strict: true,
+          noStrings: true,
+          onlyInteger: true,
+        },
+      },
+      fsGroup: {
+        type: 'integer',
+        numericality: {
+          strict: true,
+          noStrings: true,
+          onlyInteger: true,
+        },
+      },
       command: {
         type: 'array',
       },

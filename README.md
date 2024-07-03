@@ -41,6 +41,14 @@ containers:
       - name: MY_ENV_VAR
         value: "asdf"
     replicas: 1 # Allows scaling the service to multiple replicas (max. 16, with load-balancing)
+    # Set container runtime user and group, overriding defaults
+    user: 1000
+    group: 1000
+    # Change filesystem ownership, overriding defaults
+    fsUser: 1000 
+    fsGroup: 1000
+    changeGroupOnMismatch: true # Optional
+    
     # Volume mounts are optional as you can also deploy without persistence
     volumeMounts:
       - name: mydata
