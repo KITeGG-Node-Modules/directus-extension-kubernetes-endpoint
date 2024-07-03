@@ -104,7 +104,7 @@ export default {
               undefined,
               options
             )
-            return true
+            return { success: true }
           }
           res.status(404)
           return { message: 'api_errors.not_found' }
@@ -162,11 +162,11 @@ export default {
         } catch (err) {
           if (err.body) {
             res.status(err.body.code)
-            return err.body.message
+            return { message: err.body.message }
           }
           console.error(err)
           res.status(500)
-          return err.message
+          return { message: err.message }
         }
       }, context)
     )
@@ -195,11 +195,11 @@ export default {
         } catch (err) {
           if (err.body) {
             res.status(err.body.code)
-            return err.body.message
+            return { message: err.body.message }
           }
           console.error(err)
           res.status(500)
-          return err.message
+          return { message: err.message }
         }
       }, context)
     )
@@ -256,7 +256,7 @@ export default {
                 undefined,
                 options
               )
-              return true
+              return { success: true }
             } else {
               res.status(404)
               return { message: 'api_errors.not_found' }
@@ -267,11 +267,11 @@ export default {
         } catch (err) {
           if (err.body) {
             res.status(err.body.code)
-            return err.body.message
+            return { message: err.body.message }
           }
           console.error(err)
           res.status(500)
-          return err.message
+          return { message: err.message }
         }
       }, context)
     )
@@ -296,11 +296,11 @@ export default {
         } catch (err) {
           if (err.body) {
             res.status(err.body.code)
-            return err.body.message
+            return { message: err.body.message }
           }
           console.error(err)
           res.status(500)
-          return err.message
+          return { message: err.message }
         }
       }, context)
     )
@@ -331,11 +331,11 @@ export default {
         } catch (err) {
           if (err.body) {
             res.status(err.body.code)
-            return err.body.message
+            return { message: err.body.message }
           }
           console.error(err)
           res.status(500)
-          return err.message
+          return { message: err.message }
         }
       }, context)
     )
@@ -379,11 +379,11 @@ export default {
           } catch (err) {
             if (err.body) {
               res.status(err.body.code)
-              return err.body.message
+              return { message: err.body.message }
             }
             console.error(err)
             res.status(500)
-            return err.message
+            return { message: err.message }
           }
 
           for (const payload of servicePayloads) {
@@ -398,11 +398,11 @@ export default {
             } catch (err) {
               if (err.body) {
                 res.status(err.body.code)
-                return err.body.message
+                return { message: err.body.message }
               }
               console.error(err)
               res.status(500)
-              return err.message
+              return { message: err.message }
             }
           }
 
