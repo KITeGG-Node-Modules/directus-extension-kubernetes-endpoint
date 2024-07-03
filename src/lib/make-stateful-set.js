@@ -24,7 +24,7 @@ export function makeStatefulSet(name, deployment) {
     app: name,
   }
   podTemplateSpec.metadata.annotations = {
-    'kubectl.kubernetes.io/restartedAt': DateTime.now().toISO(),
+    'llp.kitegg.de/restartedAt': DateTime.now().toISO(),
   }
   const podSpec = new k8s.V1PodSpec()
   podSpec.nodeSelector = {

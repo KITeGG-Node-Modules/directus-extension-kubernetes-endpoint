@@ -84,7 +84,7 @@ export default {
                 op: 'replace',
                 path: '/spec/template/metadata/annotations',
                 value: {
-                  'kubectl.kubernetes.io/restartedAt': DateTime.now().toISO(),
+                  'llp.kitegg.de/restartedAt': DateTime.now().toISO(),
                 },
               },
             ]
