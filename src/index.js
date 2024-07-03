@@ -226,6 +226,7 @@ export default {
             )
             if (existing.items.length === 1) {
               const scalePayload = new k8s.V1Scale()
+              scalePayload.spec = new k8s.V1ScaleSpec()
               scalePayload.spec.replicas = parseInt(scale)
               await client.patchNamespacedStatefulSetScale(
                 statefulSetName,
