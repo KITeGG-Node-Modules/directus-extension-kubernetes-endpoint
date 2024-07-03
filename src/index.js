@@ -15,6 +15,7 @@ import { createStatefulSet } from './create-stateful-set.js'
 import { getDeploymentName } from './lib/util.js'
 import { createService } from './create-service.js'
 import k8s from '@kubernetes/client-node'
+import { DateTime } from 'luxon'
 
 export default {
   id: 'kubernetes',
@@ -78,32 +79,32 @@ export default {
             `metadata.name=${statefulSetName}`
           )
           if (existing.items.length === 1) {
-            let deploymentData
-            try {
-              deploymentData = parse(deployment.data)
-            } catch (err) {
-              res.status(400)
-              return {
-                errors: [{ data: err.message }],
-              }
+            const patch = [
+              {
+                op: 'replace',
+                path: '/spec/template/metadata/annotations',
+                value: {
+                  'kubectl.kubernetes.io/restartedAt': DateTime.now().toISO(),
+                },
+              },
+            ]
+            const options = {
+              headers: {
+                'Content-type': k8s.PatchUtils.PATCH_FORMAT_JSON_PATCH,
+              },
             }
-            if (deploymentData) {
-              const validationErrors = validateDeployment(deploymentData)
-              if (validationErrors) {
-                res.status(400)
-                return validationErrors
-              }
-              const { statefulSet } = makeStatefulSet(
-                statefulSetName,
-                deploymentData
-              )
-              await client.replaceNamespacedStatefulSet(
-                statefulSetName,
-                servicesNamespace,
-                statefulSet
-              )
-              return true
-            }
+            await client.patchNamespacedStatefulSet(
+              statefulSetName,
+              servicesNamespace,
+              patch,
+              undefined,
+              undefined,
+              undefined,
+              undefined,
+              undefined,
+              options
+            )
+            return true
           }
           res.status(404)
           return { message: 'api_errors.not_found' }
