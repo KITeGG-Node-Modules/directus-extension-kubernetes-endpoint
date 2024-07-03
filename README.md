@@ -34,6 +34,8 @@ containers:
       - name: default
         port: 80
     # Optional fields
+    cpu: 8 # Allocate CPU cores (default is 4, maximum 32)
+    memory: 0.5 # Allocate memory (in Gb, default is 16.0, maximum is 64.0)
     gpu: 'nvidia.com/gpu'  # Request a GPU resource (see below for valid options)
     command: '/bin/echo', # Override the container's command
     args: ['asdf', 'hello'], # Supply arguments to the container's command

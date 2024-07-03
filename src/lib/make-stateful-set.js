@@ -57,6 +57,8 @@ export function makeStatefulSet(name, deployment) {
     if (c.gpu) {
       container.resources = new k8s.V1ResourceRequirements()
       container.resources.limits = {
+        cpu: c.cpu || 4,
+        memory: `${c.memory || 32.0}Gi`,
         [c.gpu]: c.gpuCount || 1,
       }
     }

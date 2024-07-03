@@ -55,6 +55,25 @@ export function validateDeployment(deployment) {
           lessThanOrEqualTo: 2,
         },
       },
+      cpu: {
+        type: 'integer',
+        numericality: {
+          strict: true,
+          noStrings: true,
+          onlyInteger: true,
+          greaterThanOrEqualTo: 1,
+          lessThanOrEqualTo: 32,
+        },
+      },
+      memory: {
+        type: 'number',
+        numericality: {
+          strict: true,
+          noStrings: true,
+          greaterThanOrEqualTo: 1.0,
+          lessThanOrEqualTo: 64.0,
+        },
+      },
       user: {
         type: 'integer',
         numericality: {
