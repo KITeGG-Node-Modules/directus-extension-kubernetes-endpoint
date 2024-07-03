@@ -7,6 +7,9 @@ export function makeStatefulSet(name, deployment) {
   const metadata = new k8s.V1ObjectMeta()
   metadata.name = name
   metadata.namespace = servicesNamespace
+  metadata.annotations = {
+    'kubectl.kubernetes.io/restartedAt': new Date().toString(),
+  }
   const statefulSet = new k8s.V1StatefulSet()
   statefulSet.metadata = metadata
   const spec = new k8s.V1StatefulSetSpec()
