@@ -199,11 +199,8 @@ export default {
     router.patch(
       '/deployments/:id',
       baseRequestHandler(async (ctx) => {
-        const { req, res, services } = ctx
+        const { req, res, services, user } = ctx
         const { scale } = req.params
-        if (!podName) {
-          return res.status(400).send('Pod name missing')
-        }
         const { ItemsService } = services
         const deploymentsService = new ItemsService('deployments', {
           schema: req.schema,
