@@ -15,6 +15,7 @@ import { createStatefulSet } from './create-stateful-set.js'
 import { getDeploymentName } from './lib/util.js'
 import { createService } from './create-service.js'
 import k8s from '@kubernetes/client-node'
+import { DateTime } from 'luxon'
 
 export default {
   id: 'kubernetes',
@@ -40,6 +41,58 @@ export default {
         try {
           const results = await getDeploymentInfo(user, deployment)
           return results
+        } catch (err) {
+          if (err.body) {
+            res.status(err.body.code)
+            return err.body.message
+          }
+          console.error(err)
+          res.status(500)
+          return err.message
+        }
+      }, context)
+    )
+
+    router.get(
+      '/deployments/:id/hooks/restart',
+      baseRequestHandler(async (ctx) => {
+        const { req, res, user, services } = ctx
+        const { ItemsService } = services
+        const deploymentsService = new ItemsService('deployments', {
+          schema: req.schema,
+          accountability: req.accountability,
+        })
+        const deployment = await deploymentsService.readOne(req.params.id)
+        if (!deployment) {
+          return res.status(404).send('No such deployment found')
+        }
+        try {
+          const statefulSetName = getDeploymentName(user, deployment.id)
+          const client = getKubernetesClient(servicesNamespace, k8s.AppsV1Api)
+          const { body: existing } = await client.listNamespacedStatefulSet(
+            servicesNamespace,
+            undefined,
+            undefined,
+            undefined,
+            `metadata.name=${statefulSetName}`
+          )
+          if (existing.items.length === 1) {
+            const restartPayload = new k8s.V1StatefulSet()
+            restartPayload.spec = new k8s.V1StatefulSetSpec()
+            restartPayload.spec.template = new k8s.V1PodTemplateSpec()
+            restartPayload.spec.template.metadata = new k8s.V1ObjectMeta()
+            restartPayload.spec.template.metadata.annotations = {
+              'kubectl.kubernetes.io/restartedAt': DateTime.now().toISO(),
+            }
+            await client.patchNamespacedStatefulSet(
+              statefulSetName,
+              servicesNamespace,
+              restartPayload
+            )
+            return true
+          } else {
+            return res.status(404).send('No such deployment found')
+          }
         } catch (err) {
           if (err.body) {
             res.status(err.body.code)

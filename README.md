@@ -122,6 +122,16 @@ This request returns an object in this format:
 }
 ```
 
+### Deployment Hooks
+
+#### Restart
+
+To restart the deployment, you can access this hook:
+
+```
+GET /kubernetes/deployments/<service ID>/hooks/restart
+```
+
 ### Scaling (stopping) a deployment
 
 To change the scale of a deployment at runtime, call this endpoint:
