@@ -242,10 +242,21 @@ export default {
                   },
                 },
               ]
+              const options = {
+                headers: {
+                  'Content-type': k8s.PatchUtils.PATCH_FORMAT_JSON_PATCH,
+                },
+              }
               await client.patchNamespacedStatefulSetScale(
                 statefulSetName,
                 servicesNamespace,
-                patch
+                patch,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                options
               )
               return true
             } else {
