@@ -200,7 +200,7 @@ export default {
       '/deployments/:id',
       baseRequestHandler(async (ctx) => {
         const { req, res, services, user } = ctx
-        const { scale } = req.params
+        const { scale } = req.query
         const { ItemsService } = services
         const deploymentsService = new ItemsService('deployments', {
           schema: req.schema,
