@@ -8,9 +8,6 @@ export function makeStatefulSet(name, deployment) {
   const metadata = new k8s.V1ObjectMeta()
   metadata.name = name
   metadata.namespace = servicesNamespace
-  metadata.annotations = {
-    'kubectl.kubernetes.io/restartedAt': DateTime.now().toISO(),
-  }
   const statefulSet = new k8s.V1StatefulSet()
   statefulSet.metadata = metadata
   const spec = new k8s.V1StatefulSetSpec()
@@ -25,6 +22,9 @@ export function makeStatefulSet(name, deployment) {
   podTemplateSpec.metadata = new k8s.V1ObjectMeta()
   podTemplateSpec.metadata.labels = {
     app: name,
+  }
+  podTemplateSpec.metadata.annotations = {
+    'kubectl.kubernetes.io/restartedAt': DateTime.now().toISO(),
   }
   const podSpec = new k8s.V1PodSpec()
   podSpec.nodeSelector = {
