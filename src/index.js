@@ -15,7 +15,6 @@ import { createStatefulSet } from './create-stateful-set.js'
 import { getDeploymentName } from './lib/util.js'
 import { createService } from './create-service.js'
 import k8s from '@kubernetes/client-node'
-import { DateTime } from 'luxon'
 
 export default {
   id: 'kubernetes',
@@ -77,22 +76,34 @@ export default {
             `metadata.name=${statefulSetName}`
           )
           if (existing.items.length === 1) {
-            const restartPayload = new k8s.V1StatefulSet()
-            restartPayload.spec = new k8s.V1StatefulSetSpec()
-            restartPayload.spec.template = new k8s.V1PodTemplateSpec()
-            restartPayload.spec.template.metadata = new k8s.V1ObjectMeta()
-            restartPayload.spec.template.metadata.annotations = {
-              'kubectl.kubernetes.io/restartedAt': DateTime.now().toISO(),
+            let deploymentData
+            try {
+              deploymentData = parse(deployment.data)
+            } catch (err) {
+              res.status(400)
+              return {
+                errors: [{ data: err.message }],
+              }
             }
-            await client.patchNamespacedStatefulSet(
-              statefulSetName,
-              servicesNamespace,
-              restartPayload
-            )
-            return true
-          } else {
-            return res.status(404).send('No such deployment found')
+            if (deploymentData) {
+              const validationErrors = validateDeployment(deploymentData)
+              if (validationErrors) {
+                res.status(400)
+                return validationErrors
+              }
+              const { statefulSet } = makeStatefulSet(
+                statefulSetName,
+                deploymentData
+              )
+              await client.replaceNamespacedStatefulSet(
+                statefulSetName,
+                servicesNamespace,
+                statefulSet
+              )
+              return true
+            }
           }
+          return res.status(404).send('No such deployment found')
         } catch (err) {
           if (err.body) {
             res.status(err.body.code)
