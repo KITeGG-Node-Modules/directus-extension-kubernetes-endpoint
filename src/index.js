@@ -233,10 +233,14 @@ export default {
               const scalePayload = new k8s.V1Scale()
               scalePayload.spec = new k8s.V1ScaleSpec()
               scalePayload.spec.replicas = parseInt(scale)
-              await client.replaceNamespacedStatefulSetScale(
+              await client.patchNamespacedStatefulSetScale(
                 statefulSetName,
                 servicesNamespace,
-                scalePayload
+                {
+                  spec: {
+                    replicas: parseInt(scale),
+                  },
+                }
               )
               return true
             } else {
