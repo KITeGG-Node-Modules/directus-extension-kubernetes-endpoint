@@ -233,20 +233,10 @@ export default {
               const scalePayload = new k8s.V1Scale()
               scalePayload.spec = new k8s.V1ScaleSpec()
               scalePayload.spec.replicas = parseInt(scale)
-              await client.patchNamespacedStatefulSetScale(
+              await client.replaceNamespacedStatefulSetScale(
                 statefulSetName,
                 servicesNamespace,
-                scalePayload,
-                undefined,
-                undefined,
-                undefined,
-                undefined,
-                undefined,
-                {
-                  headers: {
-                    'Content-type': k8s.PatchUtils.PATCH_FORMAT_JSON_PATCH,
-                  },
-                }
+                scalePayload
               )
               return true
             } else {
