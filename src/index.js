@@ -35,7 +35,8 @@ export default {
         })
         const deployment = await deploymentsService.readOne(req.params.id)
         if (!deployment) {
-          return res.status(404).send('No such deployment found')
+          res.status(404)
+          return { message: 'api_errors.not_found' }
         }
         try {
           const results = await getDeploymentInfo(user, deployment)
@@ -63,7 +64,8 @@ export default {
         })
         const deployment = await deploymentsService.readOne(req.params.id)
         if (!deployment) {
-          return res.status(404).send('No such deployment found')
+          res.status(404)
+          return { message: 'api_errors.not_found' }
         }
         try {
           const statefulSetName = getDeploymentName(user, deployment.id)
@@ -103,7 +105,8 @@ export default {
               return true
             }
           }
-          return res.status(404).send('No such deployment found')
+          res.status(404)
+          return { message: 'api_errors.not_found' }
         } catch (err) {
           if (err.body) {
             res.status(err.body.code)
@@ -122,7 +125,8 @@ export default {
         const { req, res, services } = ctx
         const { podName } = req.params
         if (!podName) {
-          return res.status(400).send('Pod name missing')
+          res.status(400)
+          return { message: 'api_errors.pod_name_missing' }
         }
         const { ItemsService } = services
         const deploymentsService = new ItemsService('deployments', {
@@ -131,7 +135,8 @@ export default {
         })
         const deployment = await deploymentsService.readOne(req.params.id)
         if (!deployment) {
-          return res.status(404).send('No such deployment found')
+          res.status(404)
+          return { message: 'api_errors.not_found' }
         }
         try {
           const coreClient = getKubernetesClient(servicesNamespace)
@@ -171,7 +176,8 @@ export default {
         const { req, res, services } = ctx
         const { podName } = req.params
         if (!podName) {
-          return res.status(400).send('Pod name missing')
+          res.status(400)
+          return { message: 'api_errors.pod_name_missing' }
         }
         const { ItemsService } = services
         const deploymentsService = new ItemsService('deployments', {
@@ -180,7 +186,8 @@ export default {
         })
         const deployment = await deploymentsService.readOne(req.params.id)
         if (!deployment) {
-          return res.status(404).send('No such deployment found')
+          res.status(404)
+          return { message: 'api_errors.not_found' }
         }
         try {
           return getPodEvents(podName)
@@ -208,7 +215,8 @@ export default {
         })
         const deployment = await deploymentsService.readOne(req.params.id)
         if (!deployment) {
-          return res.status(404).send('No such deployment found')
+          res.status(404)
+          return { message: 'api_errors.not_found' }
         }
         try {
           const statefulSetName = getDeploymentName(user, deployment.id)
@@ -232,10 +240,12 @@ export default {
               )
               return true
             } else {
-              return res.status(404).send('No such deployment found')
+              res.status(404)
+              return { message: 'api_errors.not_found' }
             }
           }
-          return res.status(400).send('Bad request')
+          res.status(400)
+          return { message: 'api_errors.bad_request' }
         } catch (err) {
           if (err.body) {
             res.status(err.body.code)
@@ -259,7 +269,8 @@ export default {
         })
         const deployment = await deploymentsService.readOne(req.params.id)
         if (!deployment) {
-          return res.status(404).send('No such deployment found')
+          res.status(404)
+          return { message: 'api_errors.not_found' }
         }
         try {
           await deleteDeployment(user, deployment)
@@ -282,7 +293,8 @@ export default {
         const { req, res, services } = ctx
         const { podName } = req.params
         if (!podName) {
-          return res.status(400).send('Pod name missing')
+          res.status(400)
+          return { message: 'api_errors.pod_name_missing' }
         }
         const { ItemsService } = services
         const deploymentsService = new ItemsService('deployments', {
@@ -291,7 +303,8 @@ export default {
         })
         const deployment = await deploymentsService.readOne(req.params.id)
         if (!deployment) {
-          return res.status(404).send('No such deployment found')
+          res.status(404)
+          return { message: 'api_errors.not_found' }
         }
         try {
           const coreClient = getKubernetesClient(servicesNamespace)
@@ -320,7 +333,8 @@ export default {
         })
         const deployment = await deploymentsService.readOne(req.params.id)
         if (!deployment) {
-          return res.status(404).send('No such deployment found')
+          res.status(404)
+          return { message: 'api_errors.not_found' }
         }
         const statefulSetName = getDeploymentName(user, deployment.id)
         let deploymentData
