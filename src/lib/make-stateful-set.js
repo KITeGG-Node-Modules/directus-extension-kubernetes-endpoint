@@ -35,6 +35,7 @@ export function makeStatefulSet(name, deployment) {
     container.command = c.command
     container.args = c.args
     container.imagePullPolicy = 'Always'
+    container.securityContext = new k8s.V1SecurityContext()
     container.securityContext.allowPrivilegeEscalation = false
 
     if (typeof c.user === 'number') {
@@ -44,6 +45,8 @@ export function makeStatefulSet(name, deployment) {
       container.securityContext.runAsGroup = c.group
     }
 
+    podSpec.securityContext =
+      podSpec.securityContext || new k8s.V1SecurityContext()
     if (c.fsUser) {
       podSpec.securityContext.fsUser = c.fsUser
     }
