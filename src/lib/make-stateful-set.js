@@ -1,5 +1,6 @@
 import k8s from '@kubernetes/client-node'
 import { servicesNamespace } from './config.js'
+import { DateTime } from 'luxon'
 
 export function makeStatefulSet(name, deployment) {
   const servicePayloads = []
@@ -8,7 +9,7 @@ export function makeStatefulSet(name, deployment) {
   metadata.name = name
   metadata.namespace = servicesNamespace
   metadata.annotations = {
-    'kubectl.kubernetes.io/restartedAt': new Date().toString(),
+    'kubectl.kubernetes.io/restartedAt': DateTime.now().toISO(),
   }
   const statefulSet = new k8s.V1StatefulSet()
   statefulSet.metadata = metadata
