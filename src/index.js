@@ -236,7 +236,17 @@ export default {
               await client.patchNamespacedStatefulSetScale(
                 statefulSetName,
                 servicesNamespace,
-                scalePayload
+                scalePayload,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                {
+                  headers: {
+                    'Content-type': k8s.PatchUtils.PATCH_FORMAT_JSON_PATCH,
+                  },
+                }
               )
               return true
             } else {
