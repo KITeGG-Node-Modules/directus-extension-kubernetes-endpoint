@@ -30,7 +30,7 @@ export function makeStatefulSet(name, deployment) {
   podSpec.nodeSelector = {
     'node-role.kubernetes.io/worker': 'worker',
   }
-  podSpec.restartPolicy = 'Always'
+  podSpec.restartPolicy = deployment.restartPolicy || 'Always'
 
   podSpec.containers = deployment.containers.map((c) => {
     const container = new k8s.V1Container()

@@ -7,6 +7,19 @@ export function validateDeployment(deployment) {
       presence: true,
       type: 'array',
     },
+    replicas: {
+      type: 'integer',
+      numericality: {
+        strict: true,
+        noStrings: true,
+        onlyInteger: true,
+        lessThanOrEqualTo: 16,
+      },
+    },
+    restartPolicy: {
+      type: 'string',
+      inclusion: ['Always', 'OnFailure', 'Never'],
+    },
   })
   if (topLevelErrors) {
     validationErrors = validationErrors.concat(topLevelErrors)
@@ -111,15 +124,6 @@ export function validateDeployment(deployment) {
       },
       args: {
         type: 'array',
-      },
-      replicas: {
-        type: 'integer',
-        numericality: {
-          strict: true,
-          noStrings: true,
-          onlyInteger: true,
-          lessThanOrEqualTo: 16,
-        },
       },
     })
     if (containerErrors) {

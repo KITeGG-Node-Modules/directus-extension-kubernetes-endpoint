@@ -26,6 +26,8 @@ only a dash as a special character) are optional and refer to the values in the 
 The YAML describing the deployment is structured as follows:
 
 ```yaml
+replicas: 1 # Allows scaling the service to multiple replicas (max. 16, with load-balancing)
+restartPolicy: Never
 containers:
   # Mandatory values
   - name: nginx
@@ -42,7 +44,6 @@ containers:
     environment:
       - name: MY_ENV_VAR
         value: "asdf"
-    replicas: 1 # Allows scaling the service to multiple replicas (max. 16, with load-balancing)
     # Set container runtime user and group, overriding defaults
     user: 1000
     group: 1000
