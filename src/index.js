@@ -12,7 +12,7 @@ import { getDeploymentInfo } from './get-deployment-info.js'
 import { getPodEvents } from './get-pod-events.js'
 import { deleteDeployment } from './delete-deployment.js'
 import { createStatefulSet } from './create-stateful-set.js'
-import { getDeploymentName } from './lib/util.js'
+import { getDeploymentName, handleErrorResponse } from './lib/util.js'
 import { createService } from './create-service.js'
 import k8s from '@kubernetes/client-node'
 import { DateTime } from 'luxon'
@@ -43,13 +43,7 @@ export default {
           const results = await getDeploymentInfo(user, deployment)
           return results
         } catch (err) {
-          if (err.body) {
-            res.status(err.body.code)
-            return err.body.message
-          }
-          console.error(err)
-          res.status(500)
-          return err.message
+          return handleErrorResponse(res, err)
         }
       }, context)
     )
@@ -109,13 +103,7 @@ export default {
           res.status(404)
           return { message: 'api_errors.not_found' }
         } catch (err) {
-          if (err.body) {
-            res.status(err.body.code)
-            return err.body.message
-          }
-          console.error(err)
-          res.status(500)
-          return err.message
+          return handleErrorResponse(res, err)
         }
       }, context)
     )
@@ -160,13 +148,7 @@ export default {
           res.setHeader('content-type', 'text/plain')
           return body
         } catch (err) {
-          if (err.body) {
-            res.status(err.body.code)
-            return { message: err.body.message }
-          }
-          console.error(err)
-          res.status(500)
-          return { message: err.message }
+          return handleErrorResponse(res, err)
         }
       }, context)
     )
@@ -193,13 +175,7 @@ export default {
         try {
           return getPodEvents(podName)
         } catch (err) {
-          if (err.body) {
-            res.status(err.body.code)
-            return { message: err.body.message }
-          }
-          console.error(err)
-          res.status(500)
-          return { message: err.message }
+          return handleErrorResponse(res, err)
         }
       }, context)
     )
@@ -265,13 +241,7 @@ export default {
           res.status(400)
           return { message: 'api_errors.bad_request' }
         } catch (err) {
-          if (err.body) {
-            res.status(err.body.code)
-            return { message: err.body.message }
-          }
-          console.error(err)
-          res.status(500)
-          return { message: err.message }
+          return handleErrorResponse(res, err)
         }
       }, context)
     )
@@ -294,13 +264,7 @@ export default {
           await deleteDeployment(user, deployment)
           return { deleted: deployment.id }
         } catch (err) {
-          if (err.body) {
-            res.status(err.body.code)
-            return { message: err.body.message }
-          }
-          console.error(err)
-          res.status(500)
-          return { message: err.message }
+          return handleErrorResponse(res, err)
         }
       }, context)
     )
@@ -329,13 +293,7 @@ export default {
           await coreClient.deleteNamespacedPod(podName, servicesNamespace)
           return { deleted: podName }
         } catch (err) {
-          if (err.body) {
-            res.status(err.body.code)
-            return { message: err.body.message }
-          }
-          console.error(err)
-          res.status(500)
-          return { message: err.message }
+          return handleErrorResponse(res, err)
         }
       }, context)
     )
@@ -377,13 +335,7 @@ export default {
           try {
             await createStatefulSet(res, statefulSet, statefulSetName)
           } catch (err) {
-            if (err.body) {
-              res.status(err.body.code)
-              return { message: err.body.message }
-            }
-            console.error(err)
-            res.status(500)
-            return { message: err.message }
+            return handleErrorResponse(res, err)
           }
 
           for (const payload of servicePayloads) {
@@ -396,13 +348,7 @@ export default {
             try {
               await createService(res, service, serviceName)
             } catch (err) {
-              if (err.body) {
-                res.status(err.body.code)
-                return { message: err.body.message }
-              }
-              console.error(err)
-              res.status(500)
-              return { message: err.message }
+              return handleErrorResponse(res, err)
             }
           }
 

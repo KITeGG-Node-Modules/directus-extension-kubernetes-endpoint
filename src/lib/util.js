@@ -13,3 +13,13 @@ export function getDeploymentName(user, name) {
   const nameSlug = getNameSlug(name)
   return `sd-${nameSlug}`
 }
+
+export function handleErrorResponse(res, err) {
+  if (err.body) {
+    res.status(err.body.code)
+    return err.body.message
+  }
+  console.error(err)
+  res.status(500)
+  return err.message
+}
