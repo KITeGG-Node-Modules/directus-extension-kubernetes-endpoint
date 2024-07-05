@@ -46,7 +46,7 @@ export function makeStatefulSet(name, deployment) {
     if (c.changeGroupOnMismatch) {
       podSpec.securityContext.fsGroupChangePolicy = 'OnRootMismatch'
     }
-    return makeContainer(c, servicePayloads)
+    return makeContainer(c, servicePayloads, name)
   })
   podTemplateSpec.spec = podSpec
   spec.template = podTemplateSpec

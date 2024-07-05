@@ -123,6 +123,41 @@ This request returns an object in this format:
 }
 ```
 
+### Secrets
+
+You can store secrets as YAML like this:
+
+```yaml
+mySecretKey: asdf
+otherValue: ghjk
+```
+
+Using this endpoint:
+
+```
+PUT /kubernetes/deployments/<service ID>/secret
+```
+
+and a payload like this:
+
+```json
+{
+  "data": "<YAML content>"
+}
+```
+
+Retrieving an existing secret uses a `GET` method call to the same endpoint.
+
+Secrets can then be used as environment variables:
+
+```yaml
+containers:
+  - name: example
+    environment:
+      - name: MY_SECRET_ENV_VAR
+        fromSecret: mySecretKey
+```
+
 ### Deployment Hooks
 
 #### Restart

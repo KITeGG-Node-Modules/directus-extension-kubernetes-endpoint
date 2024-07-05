@@ -1,6 +1,6 @@
 import k8s from '@kubernetes/client-node'
 
-export function makeContainer(c, servicePayloads) {
+export function makeContainer(c, servicePayloads, statefulSetName) {
   const container = new k8s.V1Container()
   container.name = c.name
   container.image = c.image
@@ -36,7 +36,14 @@ export function makeContainer(c, servicePayloads) {
   container.env = (c.environment || []).map((e) => {
     const envVar = new k8s.V1EnvVar()
     envVar.name = e.name
-    envVar.value = e.value
+    if (e.fromSecret) {
+      envVar.valueFrom = new k8s.V1EnvVarSource()
+      envVar.valueFrom.secretKeyRef = new k8s.V1SecretKeySelector()
+      envVar.valueFrom.secretKeyRef.name = statefulSetName
+      envVar.valueFrom.secretKeyRef.key = e.fromSecret
+    } else {
+      envVar.value = e.value
+    }
     return envVar
   })
   container.volumeMounts = (c.volumeMounts || []).map((v) => {

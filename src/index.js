@@ -2,7 +2,7 @@ import {
   baseRequestHandler,
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
-import { parse } from 'yaml'
+import { parse, stringify } from 'yaml'
 import { servicesNamespace } from './lib/config.js'
 import { validateDeployment } from './lib/validate-deployment.js'
 import { makeStatefulSet } from './lib/make-stateful-set.js'
@@ -16,6 +16,8 @@ import { getDeploymentName, handleErrorResponse } from './lib/util.js'
 import { createService } from './create-service.js'
 import k8s from '@kubernetes/client-node'
 import { DateTime } from 'luxon'
+import { makeSecret } from './lib/make-secret.js'
+import { createSecret } from './create-secret.js'
 
 export default {
   id: 'kubernetes',
@@ -356,6 +358,73 @@ export default {
         }
         res.status(404)
         return { message: 'api_errors.not_found' }
+      }, context)
+    )
+
+    router.put(
+      '/deployments/:id/secret',
+      baseRequestHandler(async (ctx) => {
+        const { req, res, user, services } = ctx
+        const { ItemsService } = services
+        const deploymentsService = new ItemsService('deployments', {
+          schema: req.schema,
+          accountability: req.accountability,
+        })
+        const deployment = await deploymentsService.readOne(req.params.id)
+        if (!deployment) {
+          res.status(404)
+          return { message: 'api_errors.not_found' }
+        }
+        const statefulSetName = getDeploymentName(user, deployment.id)
+        let secretData
+        try {
+          secretData = parse(req.body?.data)
+        } catch (err) {
+          res.status(400)
+          return {
+            errors: [{ data: err.message }],
+          }
+        }
+        if (secretData) {
+          const secret = makeSecret(statefulSetName, secretData)
+          try {
+            await createSecret(res, secret, statefulSetName)
+          } catch (err) {
+            return handleErrorResponse(res, err)
+          }
+
+          return secretData
+        }
+        res.status(400)
+        return { message: 'api_errors.bad_request' }
+      }, context)
+    )
+
+    router.get(
+      '/deployments/:id/secret',
+      baseRequestHandler(async (ctx) => {
+        const { req, res, services, user } = ctx
+        const { ItemsService } = services
+        const deploymentsService = new ItemsService('deployments', {
+          schema: req.schema,
+          accountability: req.accountability,
+        })
+        const deployment = await deploymentsService.readOne(req.params.id)
+        if (!deployment) {
+          res.status(404)
+          return { message: 'api_errors.not_found' }
+        }
+        try {
+          const statefulSetName = getDeploymentName(user, deployment.id)
+          const coreClient = getKubernetesClient(servicesNamespace)
+          const secret = await coreClient.readNamespacedSecret(
+            statefulSetName,
+            servicesNamespace
+          )
+          return { data: stringify(secret.body.data) }
+        } catch (err) {
+          return handleErrorResponse(res, err)
+        }
       }, context)
     )
   },

@@ -159,7 +159,9 @@ export function validateDeployment(deployment) {
             type: 'string',
           },
           value: {
-            presence: true,
+            type: 'string',
+          },
+          fromSecret: {
             type: 'string',
           },
         })
