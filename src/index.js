@@ -378,7 +378,9 @@ export default {
         const statefulSetName = getDeploymentName(user, deployment.id)
         let secretData
         try {
+          console.log('Raw secret:', req.body?.data)
           secretData = parse(req.body?.data)
+          console.log('Parsed secret:', JSON.stringify(secretData))
         } catch (err) {
           res.status(400)
           return {
