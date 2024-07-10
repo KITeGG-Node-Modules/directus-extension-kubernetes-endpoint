@@ -376,16 +376,25 @@ export default {
           return { message: 'api_errors.not_found' }
         }
         const statefulSetName = getDeploymentName(user, deployment.id)
-        let secretData
+        let secretData = {}
         try {
-          secretData = parse(req.body?.data)
+          if (typeof req.body?.data === 'string') {
+            secretData = parse(req.body?.data)
+          } else {
+            secretData = req.body?.data
+          }
+          for (const key in secretData) {
+            if (typeof secretData[key] !== 'string') {
+              secretData[key] = secretData[key].toString()
+            }
+          }
         } catch (err) {
           res.status(400)
           return {
             errors: [{ data: err.message }],
           }
         }
-        if (secretData) {
+        if (Object.keys(secretData).length) {
           const secret = makeSecret(statefulSetName, secretData)
           try {
             await createSecret(res, secret, statefulSetName)
@@ -421,7 +430,12 @@ export default {
             statefulSetName,
             servicesNamespace
           )
-          return { data: stringify(secret.body.data) }
+          const secretData = secret.body.data
+          for (const key in secretData) {
+            const buffer = Buffer.from(secretData[key], 'base64')
+            secretData[key] = buffer.toString()
+          }
+          return { data: stringify(secretData) }
         } catch (err) {
           return handleErrorResponse(res, err)
         }
