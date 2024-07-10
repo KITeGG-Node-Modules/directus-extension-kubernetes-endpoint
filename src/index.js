@@ -435,7 +435,7 @@ export default {
             const buffer = Buffer.from(secretData[key], 'base64')
             secretData[key] = buffer.toString()
           }
-          return { data: stringify(secretData) }
+          return { data: secretData }
         } catch (err) {
           return handleErrorResponse(res, err)
         }
