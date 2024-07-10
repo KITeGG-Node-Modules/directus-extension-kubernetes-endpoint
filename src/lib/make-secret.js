@@ -7,6 +7,6 @@ export function makeSecret(name, data) {
   secret.metadata.name = name
   secret.metadata.namespace = servicesNamespace
   secret.type = 'Opaque'
-  secret.data = data
+  secret.stringData = data
   return secret
 }
