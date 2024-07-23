@@ -123,14 +123,54 @@ This request returns an object in this format:
 }
 ```
 
-### Secrets
+### Configs
 
-You can store secrets as YAML like this:
+Configs allow you to store variables to reference in your YAML deployment setup.
+
+Using this endpoint:
+
+```
+PUT /kubernetes/deployments/<service ID>/config
+```
+
+and a payload like this:
 
 ```yaml
-mySecretKey: asdf
-otherValue: ghjk
+myVariable: asdf
+otherVariable: ghjk
 ```
+
+```json
+{
+  "data": "<YAML content>"
+}
+```
+
+or just using a plain object:
+
+```json
+{
+  "data": {
+    "key": "value"
+  }
+}
+```
+
+Retrieving an existing config uses a `GET` method call to the same endpoint.
+
+Configs can then be used as environment variables:
+
+```yaml
+containers:
+  - name: example
+    environment:
+      - name: MY_ENV_VAR
+        fromConfig: myConfigKey
+```
+
+### Secrets
+
+Secrets allow you to store secret variables like API keys separately.
 
 Using this endpoint:
 
@@ -138,11 +178,26 @@ Using this endpoint:
 PUT /kubernetes/deployments/<service ID>/secret
 ```
 
-and a payload like this:
+and a YAML payload like this:
+
+```yaml
+mySecretKey: asdf
+otherValue: ghjk
+```
 
 ```json
 {
   "data": "<YAML content>"
+}
+```
+
+or just using a plain object:
+
+```json
+{
+  "data": {
+    "key": "value"
+  }
 }
 ```
 
