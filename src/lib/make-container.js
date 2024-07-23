@@ -41,6 +41,11 @@ export function makeContainer(c, servicePayloads, statefulSetName) {
       envVar.valueFrom.secretKeyRef = new k8s.V1SecretKeySelector()
       envVar.valueFrom.secretKeyRef.name = statefulSetName
       envVar.valueFrom.secretKeyRef.key = e.fromSecret
+    } else if (e.fromConfig) {
+      envVar.valueFrom = new k8s.V1EnvVarSource()
+      envVar.valueFrom.configMapKeyRef = new k8s.V1ConfigMapKeySelector()
+      envVar.valueFrom.configMapKeyRef.name = statefulSetName
+      envVar.valueFrom.configMapKeyRef.key = e.fromConfig
     } else {
       envVar.value = e.value
     }

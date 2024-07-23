@@ -164,6 +164,9 @@ export function validateDeployment(deployment) {
           fromSecret: {
             type: 'string',
           },
+          fromConfig: {
+            type: 'string',
+          },
         })
         if (envVarErrors)
           validationErrors = validationErrors.concat(envVarErrors)

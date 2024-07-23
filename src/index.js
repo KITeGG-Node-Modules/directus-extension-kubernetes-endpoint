@@ -18,6 +18,8 @@ import k8s from '@kubernetes/client-node'
 import { DateTime } from 'luxon'
 import { makeSecret } from './lib/make-secret.js'
 import { createSecret } from './create-secret.js'
+import { makeConfigMap } from './lib/make-config-map.js'
+import { createConfigMap } from './create-config-map.js'
 
 export default {
   id: 'kubernetes',
@@ -436,6 +438,82 @@ export default {
             secretData[key] = buffer.toString()
           }
           return { data: secretData }
+        } catch (err) {
+          return handleErrorResponse(res, err)
+        }
+      }, context)
+    )
+
+    router.put(
+      '/deployments/:id/config',
+      baseRequestHandler(async (ctx) => {
+        const { req, res, user, services } = ctx
+        const { ItemsService } = services
+        const deploymentsService = new ItemsService('deployments', {
+          schema: req.schema,
+          accountability: req.accountability,
+        })
+        const deployment = await deploymentsService.readOne(req.params.id)
+        if (!deployment) {
+          res.status(404)
+          return { message: 'api_errors.not_found' }
+        }
+        const statefulSetName = getDeploymentName(user, deployment.id)
+        let configMapData = {}
+        try {
+          if (typeof req.body?.data === 'string') {
+            configMapData = parse(req.body?.data)
+          } else {
+            configMapData = req.body?.data
+          }
+          for (const key in configMapData) {
+            if (typeof configMapData[key] !== 'string') {
+              configMapData[key] = configMapData[key].toString()
+            }
+          }
+        } catch (err) {
+          res.status(400)
+          return {
+            errors: [{ data: err.message }],
+          }
+        }
+        if (Object.keys(configMapData).length) {
+          const configMap = makeConfigMap(statefulSetName, configMapData)
+          try {
+            await createConfigMap(res, configMap, statefulSetName)
+          } catch (err) {
+            return handleErrorResponse(res, err)
+          }
+
+          return configMapData
+        }
+        res.status(400)
+        return { message: 'api_errors.bad_request' }
+      }, context)
+    )
+
+    router.get(
+      '/deployments/:id/config',
+      baseRequestHandler(async (ctx) => {
+        const { req, res, services, user } = ctx
+        const { ItemsService } = services
+        const deploymentsService = new ItemsService('deployments', {
+          schema: req.schema,
+          accountability: req.accountability,
+        })
+        const deployment = await deploymentsService.readOne(req.params.id)
+        if (!deployment) {
+          res.status(404)
+          return { message: 'api_errors.not_found' }
+        }
+        try {
+          const statefulSetName = getDeploymentName(user, deployment.id)
+          const coreClient = getKubernetesClient(servicesNamespace)
+          const configMap = await coreClient.readNamespacedConfigMap(
+            statefulSetName,
+            servicesNamespace
+          )
+          return { data: configMap.body.data }
         } catch (err) {
           return handleErrorResponse(res, err)
         }
