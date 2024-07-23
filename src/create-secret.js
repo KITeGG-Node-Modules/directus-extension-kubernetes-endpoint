@@ -1,5 +1,4 @@
 import { getKubernetesClient } from 'kitegg-directus-extension-common'
-import k8s from '@kubernetes/client-node'
 import { servicesNamespace } from './lib/config.js'
 
 export async function createSecret(res, secret, statefulSetName) {
