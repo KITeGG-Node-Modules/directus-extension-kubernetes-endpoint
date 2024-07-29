@@ -150,7 +150,7 @@ export default {
             !!req.query.timestamps
           )
           res.setHeader('content-type', 'text/plain')
-          return body
+          return body || ''
         } catch (err) {
           return handleErrorResponse(res, err)
         }
