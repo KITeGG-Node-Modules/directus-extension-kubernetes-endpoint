@@ -396,18 +396,13 @@ export default {
             errors: [{ data: err.message }],
           }
         }
-        if (Object.keys(secretData).length) {
-          const secret = makeSecret(statefulSetName, secretData)
-          try {
-            await createSecret(res, secret, statefulSetName)
-          } catch (err) {
-            return handleErrorResponse(res, err)
-          }
-
-          return secretData
+        const secret = makeSecret(statefulSetName, secretData)
+        try {
+          await createSecret(res, secret, statefulSetName)
+        } catch (err) {
+          return handleErrorResponse(res, err)
         }
-        res.status(400)
-        return { message: 'api_errors.bad_request' }
+        return secretData
       }, context)
     )
 
