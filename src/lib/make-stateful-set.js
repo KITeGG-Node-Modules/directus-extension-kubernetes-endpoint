@@ -33,6 +33,7 @@ export function makeStatefulSet(name, deployment) {
     'node-role.kubernetes.io/worker': 'worker',
   }
   podSpec.restartPolicy = deployment.restartPolicy || 'Always'
+  podSpec.enableServiceLinks = false
 
   podSpec.containers = deployment.containers.map((c) => {
     podSpec.securityContext =
