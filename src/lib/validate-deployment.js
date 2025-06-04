@@ -84,7 +84,7 @@ export function validateDeployment(deployment) {
           strict: true,
           noStrings: true,
           greaterThanOrEqualTo: 1.0,
-          lessThanOrEqualTo: 64.0,
+          lessThanOrEqualTo: 128.0,
         },
       },
       user: {
