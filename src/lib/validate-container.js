@@ -104,27 +104,29 @@ export function validateContainer(container, validationErrors = []) {
     return validationErrors
   }
 
-  for (const port of container.ports) {
-    const portErrors = validate(port, {
-      name: {
-        presence: true,
-        type: 'string',
-      },
-      port: {
-        presence: true,
-        type: 'integer',
-        numericality: {
-          strict: true,
-          noStrings: true,
-          onlyInteger: true,
-          greaterThan: 0,
+  if (Array.isArray(container.ports)) {
+    for (const port of container.ports) {
+      const portErrors = validate(port, {
+        name: {
+          presence: true,
+          type: 'string',
         },
-      },
-    })
-    if (portErrors) validationErrors = validationErrors.concat(portErrors)
+        port: {
+          presence: true,
+          type: 'integer',
+          numericality: {
+            strict: true,
+            noStrings: true,
+            onlyInteger: true,
+            greaterThan: 0,
+          },
+        },
+      })
+      if (portErrors) validationErrors = validationErrors.concat(portErrors)
+    }
   }
 
-  if (container.environment) {
+  if (Array.isArray(container.environment)) {
     for (const envVar of container.environment) {
       const envVarErrors = validate(envVar, {
         name: {
@@ -145,7 +147,7 @@ export function validateContainer(container, validationErrors = []) {
     }
   }
 
-  if (container.volumeMounts) {
+  if (Array.isArray(container.volumeMounts)) {
     for (const volumeMount of container.volumeMounts) {
       const volumeMountErrors = validate(volumeMount, {
         name: {
