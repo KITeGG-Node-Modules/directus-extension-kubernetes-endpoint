@@ -25,13 +25,16 @@ export function makeContainer(c, servicePayloads, statefulSetName) {
       [c.gpu]: c.gpuCount || 1,
     }
   }
-  container.ports = (c.ports || []).map((p) => {
-    const containerPort = new k8s.V1ContainerPort()
-    containerPort.name = p.name
-    containerPort.containerPort = p.port
-    return containerPort
-  })
-  servicePayloads.push({ name: c.name, ports: c.ports })
+
+  if (Array.isArray(container.ports)) {
+    container.ports = (c.ports || []).map((p) => {
+      const containerPort = new k8s.V1ContainerPort()
+      containerPort.name = p.name
+      containerPort.containerPort = p.port
+      return containerPort
+    })
+    servicePayloads.push({ name: c.name, ports: c.ports })
+  }
 
   container.env = (c.environment || []).map((e) => {
     const envVar = new k8s.V1EnvVar()
