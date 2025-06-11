@@ -23,7 +23,6 @@ export function validateContainer(container, validationErrors = []) {
       type: 'string',
     },
     ports: {
-      presence: true,
       type: 'array',
     },
     volumeMounts: {
