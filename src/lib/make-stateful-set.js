@@ -35,20 +35,27 @@ export function makeStatefulSet(name, deployment) {
   podSpec.restartPolicy = deployment.restartPolicy || 'Always'
   podSpec.enableServiceLinks = false
 
-  podSpec.containers = deployment.containers.map((c) => {
-    podSpec.securityContext =
-      podSpec.securityContext || new k8s.V1SecurityContext()
-    if (c.fsUser) {
-      podSpec.securityContext.fsUser = c.fsUser
-    }
-    if (c.fsGroup) {
-      podSpec.securityContext.fsGroup = c.fsGroup
-    }
-    if (c.changeGroupOnMismatch) {
-      podSpec.securityContext.fsGroupChangePolicy = 'OnRootMismatch'
-    }
-    return makeContainer(c, servicePayloads, name)
-  })
+  function parseContainers(containers) {
+    return containers.map((c) => {
+      podSpec.securityContext =
+        podSpec.securityContext || new k8s.V1SecurityContext()
+      if (c.fsUser) {
+        podSpec.securityContext.fsUser = c.fsUser
+      }
+      if (c.fsGroup) {
+        podSpec.securityContext.fsGroup = c.fsGroup
+      }
+      if (c.changeGroupOnMismatch) {
+        podSpec.securityContext.fsGroupChangePolicy = 'OnRootMismatch'
+      }
+      return makeContainer(c, servicePayloads, name)
+    })
+  }
+
+  podSpec.containers = parseContainers(deployment.containers)
+  if (deployment.initContainers) {
+    podSpec.initContainers = parseContainers(deployment.initContainers)
+  }
   podTemplateSpec.spec = podSpec
   spec.template = podTemplateSpec
 

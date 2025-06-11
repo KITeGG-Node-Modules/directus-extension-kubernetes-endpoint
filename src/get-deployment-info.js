@@ -34,14 +34,24 @@ export async function getDeploymentInfo(user, deployment) {
     replicas: statefulSet.status.replicas,
     currentReplicas: statefulSet.status.currentReplicas,
     pods: (pods || []).map((pod) => {
-      let { containerStatuses } = pod.status || {}
+      let { containerStatuses, initContainerStatuses } = pod.status || {}
       containerStatuses = Array.isArray(containerStatuses)
         ? containerStatuses
+        : []
+      initContainerStatuses = Array.isArray(initContainerStatuses)
+        ? initContainerStatuses
         : []
       return {
         name: pod.metadata.name,
         phase: pod.status?.phase,
         containers: containerStatuses.map((container) => {
+          return {
+            name: container.name,
+            ready: container.ready,
+            started: container.started,
+          }
+        }),
+        initContainers: initContainerStatuses.map((container) => {
           return {
             name: container.name,
             ready: container.ready,
