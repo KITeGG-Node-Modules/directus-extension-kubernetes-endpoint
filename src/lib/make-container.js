@@ -26,8 +26,8 @@ export function makeContainer(c, servicePayloads, statefulSetName) {
     }
   }
 
-  if (Array.isArray(container.ports)) {
-    container.ports = (c.ports || []).map((p) => {
+  if (Array.isArray(c.ports)) {
+    container.ports = c.ports.map((p) => {
       const containerPort = new k8s.V1ContainerPort()
       containerPort.name = p.name
       containerPort.containerPort = p.port

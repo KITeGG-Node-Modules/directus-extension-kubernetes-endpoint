@@ -35,7 +35,7 @@ export function makeStatefulSet(name, deployment) {
   podSpec.restartPolicy = deployment.restartPolicy || 'Always'
   podSpec.enableServiceLinks = false
 
-  function parseContainers(containers, servicePayloads = []) {
+  function parseContainers(containers) {
     return containers.map((c) => {
       podSpec.securityContext =
         podSpec.securityContext || new k8s.V1SecurityContext()
@@ -52,7 +52,7 @@ export function makeStatefulSet(name, deployment) {
     })
   }
 
-  podSpec.containers = parseContainers(deployment.containers, servicePayloads)
+  podSpec.containers = parseContainers(deployment.containers)
   if (deployment.initContainers) {
     podSpec.initContainers = parseContainers(deployment.initContainers)
   }
