@@ -3,6 +3,7 @@ import { servicesNamespace } from './config.js'
 import { DateTime } from 'luxon'
 import { makeVolumeClaim } from './make-volume-claim.js'
 import { makeContainer } from './make-container.js'
+import { isSuffixedVolumeName } from './util.js'
 
 export function makeStatefulSet(name, deployment) {
   const servicePayloads = []
@@ -56,12 +57,35 @@ export function makeStatefulSet(name, deployment) {
   if (deployment.initContainers) {
     podSpec.initContainers = parseContainers(deployment.initContainers)
   }
+
+  podSpec.volumes = (deployment.volumes || [])
+    .map((v) => {
+      if (isSuffixedVolumeName(v.name)) {
+        const volume = new k8s.V1Volume()
+        volume.name = v.name
+        volume.persistentVolumeClaim =
+          new k8s.V1PersistentVolumeClaimVolumeSource()
+        volume.persistentVolumeClaim.claimName = v.name
+        return null
+      } else {
+        return null
+      }
+    })
+    .filter((v) => !!v)
+
   podTemplateSpec.spec = podSpec
   spec.template = podTemplateSpec
 
-  spec.volumeClaimTemplates = (deployment.volumes || []).map((v) =>
-    makeVolumeClaim(v)
-  )
+  spec.volumeClaimTemplates = (deployment.volumes || [])
+    .map((v) => {
+      if (isSuffixedVolumeName(v.name)) {
+        return null
+      } else {
+        return makeVolumeClaim(v)
+      }
+    })
+    .filter((v) => !!v)
+
   statefulSet.spec = spec
 
   return { statefulSet, servicePayloads }

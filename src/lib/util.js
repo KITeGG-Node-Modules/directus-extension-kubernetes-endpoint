@@ -23,3 +23,10 @@ export function handleErrorResponse(res, err) {
   res.status(500)
   return err.message
 }
+
+export function isSuffixedVolumeName(name) {
+  const regex = new RegExp(
+    '^.*-sd-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[0-9]+$'
+  )
+  return regex.test(name)
+}
