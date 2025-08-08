@@ -66,7 +66,7 @@ export function makeStatefulSet(name, deployment) {
         volume.persistentVolumeClaim =
           new k8s.V1PersistentVolumeClaimVolumeSource()
         volume.persistentVolumeClaim.claimName = v.name
-        return null
+        return volume
       } else {
         return null
       }
