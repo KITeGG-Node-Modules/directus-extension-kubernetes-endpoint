@@ -38,7 +38,7 @@ export function validateContainer(container, validationErrors = []) {
         strict: true,
         noStrings: true,
         onlyInteger: true,
-        lessThanOrEqualTo: 2,
+        lessThanOrEqualTo: 8,
       },
     },
     cpu: {
@@ -48,7 +48,7 @@ export function validateContainer(container, validationErrors = []) {
         noStrings: true,
         onlyInteger: true,
         greaterThanOrEqualTo: 1,
-        lessThanOrEqualTo: 32,
+        lessThanOrEqualTo: 256,
       },
     },
     memory: {
@@ -57,7 +57,7 @@ export function validateContainer(container, validationErrors = []) {
         strict: true,
         noStrings: true,
         greaterThanOrEqualTo: 1.0,
-        lessThanOrEqualTo: 128.0,
+        lessThanOrEqualTo: 512.0,
       },
     },
     user: {
