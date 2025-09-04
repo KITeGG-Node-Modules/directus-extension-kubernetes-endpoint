@@ -11,6 +11,7 @@ export function validateContainer(
     'nvidia.com/mig-2g.20gb',
     'nvidia.com/mig-3g.40gb',
   ]
+  console.log('GROUPS', JSON.stringify(userGroups))
   const isManagement =
     userGroups.find((group) => group.name === 'management') > -1
   const containerErrors = validate(container, {
