@@ -11,6 +11,8 @@ export function validateContainer(
     'nvidia.com/mig-2g.20gb',
     'nvidia.com/mig-3g.40gb',
   ]
+  const isManagement =
+    userGroups.find((group) => group.name === 'management') > -1
   const containerErrors = validate(container, {
     name: {
       presence: true,
@@ -42,7 +44,7 @@ export function validateContainer(
         strict: true,
         noStrings: true,
         onlyInteger: true,
-        lessThanOrEqualTo: userGroups.includes('management') ? 8 : 2,
+        lessThanOrEqualTo: isManagement ? 8 : 2,
       },
     },
     cpu: {
@@ -52,7 +54,7 @@ export function validateContainer(
         noStrings: true,
         onlyInteger: true,
         greaterThanOrEqualTo: 1,
-        lessThanOrEqualTo: userGroups.includes('management') ? 256 : 32,
+        lessThanOrEqualTo: isManagement ? 256 : 32,
       },
     },
     memory: {
@@ -61,7 +63,7 @@ export function validateContainer(
         strict: true,
         noStrings: true,
         greaterThanOrEqualTo: 1,
-        lessThanOrEqualTo: userGroups.includes('management') ? 512 : 128,
+        lessThanOrEqualTo: isManagement ? 512 : 128,
       },
     },
     user: {
