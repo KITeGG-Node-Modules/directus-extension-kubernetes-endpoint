@@ -305,7 +305,7 @@ export default {
     router.put(
       '/deployments/:id',
       baseRequestHandler(async (ctx) => {
-        const { req, res, user, services } = ctx
+        const { req, res, user, userGroups, services } = ctx
         const { ItemsService } = services
         const deploymentsService = new ItemsService('deployments', {
           schema: req.schema,
@@ -327,7 +327,10 @@ export default {
           }
         }
         if (deploymentData) {
-          const validationErrors = validateDeployment(deploymentData)
+          const validationErrors = validateDeployment(
+            deploymentData,
+            userGroups
+          )
           if (validationErrors) {
             res.status(400)
             return validationErrors

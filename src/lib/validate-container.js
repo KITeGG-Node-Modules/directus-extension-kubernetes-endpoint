@@ -1,6 +1,10 @@
 import validate from 'validate.js'
 
-export function validateContainer(container, validationErrors = []) {
+export function validateContainer(
+  container,
+  validationErrors = [],
+  userGroups = []
+) {
   const gpuProfiles = [
     'nvidia.com/gpu',
     'nvidia.com/mig-1g.10gb',
@@ -38,7 +42,7 @@ export function validateContainer(container, validationErrors = []) {
         strict: true,
         noStrings: true,
         onlyInteger: true,
-        lessThanOrEqualTo: 8,
+        lessThanOrEqualTo: userGroups.includes('management') ? 8 : 2,
       },
     },
     cpu: {
@@ -48,7 +52,7 @@ export function validateContainer(container, validationErrors = []) {
         noStrings: true,
         onlyInteger: true,
         greaterThanOrEqualTo: 1,
-        lessThanOrEqualTo: 256,
+        lessThanOrEqualTo: userGroups.includes('management') ? 256 : 32,
       },
     },
     memory: {
@@ -56,8 +60,8 @@ export function validateContainer(container, validationErrors = []) {
       numericality: {
         strict: true,
         noStrings: true,
-        greaterThanOrEqualTo: 1.0,
-        lessThanOrEqualTo: 512.0,
+        greaterThanOrEqualTo: 1,
+        lessThanOrEqualTo: userGroups.includes('management') ? 512 : 128,
       },
     },
     user: {

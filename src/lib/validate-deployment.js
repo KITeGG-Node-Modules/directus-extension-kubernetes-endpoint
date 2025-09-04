@@ -1,7 +1,7 @@
 import validate from 'validate.js'
 import { validateContainer } from './validate-container.js'
 
-export function validateDeployment(deployment) {
+export function validateDeployment(deployment, userGroups = []) {
   let validationErrors = []
   const topLevelErrors = validate(deployment, {
     containers: {
@@ -32,7 +32,7 @@ export function validateDeployment(deployment) {
 
   if (Array.isArray(deployment.initContainers)) {
     for (const container of deployment.initContainers) {
-      const containerErrors = validateContainer(container)
+      const containerErrors = validateContainer(container, [], userGroups)
       if (containerErrors && containerErrors.length) {
         validationErrors = validationErrors.concat(containerErrors)
         return validationErrors
@@ -41,7 +41,7 @@ export function validateDeployment(deployment) {
   }
 
   for (const container of deployment.containers) {
-    const containerErrors = validateContainer(container)
+    const containerErrors = validateContainer(container, [], userGroups)
     if (containerErrors && containerErrors.length) {
       validationErrors = validationErrors.concat(containerErrors)
       return validationErrors
