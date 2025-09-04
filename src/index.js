@@ -2,7 +2,7 @@ import {
   baseRequestHandler,
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
-import { parse, stringify } from 'yaml'
+import { parse } from 'yaml'
 import { servicesNamespace } from './lib/config.js'
 import { validateDeployment } from './lib/validate-deployment.js'
 import { makeStatefulSet } from './lib/make-stateful-set.js'
