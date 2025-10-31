@@ -5,14 +5,26 @@ export function validateContainer(
   validationErrors = [],
   userGroups = []
 ) {
+  const isManagement = !!userGroups.find((group) => group.name === 'management')
   const gpuProfiles = [
     'nvidia.com/gpu',
     'nvidia.com/mig-1g.10gb',
     'nvidia.com/mig-2g.20gb',
     'nvidia.com/mig-3g.40gb',
   ]
-  console.log('GROUPS', JSON.stringify(userGroups))
-  const isManagement = !!userGroups.find((group) => group.name === 'management')
+  const gpuProps = {}
+  for (const profile of gpuProfiles) {
+    // TODO: These need to be mutually exclusive
+    gpuProps[`resources.requests.${profile}`] = {
+      type: 'integer',
+      numericality: {
+        strict: true,
+        noStrings: true,
+        onlyInteger: true,
+        lessThanOrEqualTo: isManagement ? 8 : 2,
+      },
+    }
+  }
   const containerErrors = validate(container, {
     name: {
       presence: true,
@@ -28,26 +40,19 @@ export function validateContainer(
       presence: true,
       type: 'string',
     },
+    command: {
+      type: 'array',
+    },
+    args: {
+      type: 'array',
+    },
     ports: {
       type: 'array',
     },
     volumeMounts: {
       type: 'array',
     },
-    gpu: {
-      type: 'string',
-      inclusion: gpuProfiles,
-    },
-    gpuCount: {
-      type: 'integer',
-      numericality: {
-        strict: true,
-        noStrings: true,
-        onlyInteger: true,
-        lessThanOrEqualTo: isManagement ? 8 : 2,
-      },
-    },
-    cpu: {
+    'resources.requests.cpu': {
       type: 'integer',
       numericality: {
         strict: true,
@@ -57,7 +62,7 @@ export function validateContainer(
         lessThanOrEqualTo: isManagement ? 256 : 32,
       },
     },
-    memory: {
+    'resources.requests.memory': {
       type: 'number',
       numericality: {
         strict: true,
@@ -66,7 +71,8 @@ export function validateContainer(
         lessThanOrEqualTo: isManagement ? 512 : 128,
       },
     },
-    user: {
+    ...gpuProps,
+    'securityContext.runAsUser': {
       type: 'integer',
       numericality: {
         strict: true,
@@ -74,7 +80,7 @@ export function validateContainer(
         onlyInteger: true,
       },
     },
-    group: {
+    'securityContext.runAsGroup': {
       type: 'integer',
       numericality: {
         strict: true,
@@ -82,7 +88,7 @@ export function validateContainer(
         onlyInteger: true,
       },
     },
-    fsUser: {
+    'securityContext.fsUser': {
       type: 'integer',
       numericality: {
         strict: true,
@@ -90,7 +96,7 @@ export function validateContainer(
         onlyInteger: true,
       },
     },
-    fsGroup: {
+    'securityContext.fsGroup': {
       type: 'integer',
       numericality: {
         strict: true,
@@ -98,11 +104,9 @@ export function validateContainer(
         onlyInteger: true,
       },
     },
-    command: {
-      type: 'array',
-    },
-    args: {
-      type: 'array',
+    'securityContext.fsGroupChangePolicy': {
+      type: 'string',
+      inclusion: ['Always', 'OnRootMismatch'],
     },
   })
   if (containerErrors) {
@@ -142,10 +146,10 @@ export function validateContainer(
         value: {
           type: 'string',
         },
-        fromSecret: {
+        'valueFromSecret.name': {
           type: 'string',
         },
-        fromConfig: {
+        'valueFromConfig.key': {
           type: 'string',
         },
       })
@@ -170,16 +174,13 @@ export function validateContainer(
           presence: true,
           type: 'string',
           format: {
+            // TODO: Needs more precise regex
             pattern: '^\\/.*',
             message: 'must be an absolute path.',
           },
         },
         readOnly: {
           type: 'boolean',
-        },
-        type: {
-          type: 'string',
-          inclusion: ['ReadWriteOnce', 'ReadWriteMany'],
         },
       })
       if (volumeMountErrors)
