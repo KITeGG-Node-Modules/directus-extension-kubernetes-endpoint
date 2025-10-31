@@ -5,10 +5,9 @@ import {
 import { getDeploymentName, handleErrorResponse } from '../lib/util.js'
 import { parse } from 'yaml'
 import { validateDeployment } from '../lib/validate-deployment.js'
-import { makeStatefulSet } from '../lib/make-stateful-set.js'
-import { makeService } from '../lib/make-service.js'
 import { servicesNamespace } from '../lib/config.js'
 import k8s from '@kubernetes/client-node'
+import { makeDeployment } from '../lib/make-deployment.js'
 
 export function putDeployment(router, context) {
   router.put(
@@ -16,96 +15,53 @@ export function putDeployment(router, context) {
     baseRequestHandler(async (ctx) => {
       const { req, res, user, userGroups, services } = ctx
       const { ItemsService } = services
-      const deploymentsService = new ItemsService('deployments', {
+      const deploymentsService = new ItemsService('k8s_deployments', {
         schema: req.schema,
         accountability: req.accountability,
       })
-      const deployment = await deploymentsService.readOne(req.params.id)
-      if (!deployment) {
+      const deploymentObject = await deploymentsService.readOne(req.params.id)
+      if (!deploymentObject) {
         res.status(404)
         return { message: 'api_errors.not_found' }
       }
-      const statefulSetName = getDeploymentName(user, deployment.id)
-      let deploymentData
-      try {
-        deploymentData = parse(deployment.data)
-      } catch (err) {
+
+      const validationErrors = validateDeployment(deploymentObject, userGroups)
+      if (validationErrors) {
         res.status(400)
-        return {
-          errors: [{ data: err.message }],
-        }
+        return validationErrors
       }
-      if (deploymentData) {
-        const validationErrors = validateDeployment(deploymentData, userGroups)
-        if (validationErrors) {
-          res.status(400)
-          return validationErrors
-        }
-        const { statefulSet, servicePayloads } = makeStatefulSet(
-          statefulSetName,
-          deploymentData
+      const deployment = makeDeployment(deploymentObject)
+      try {
+        const client = getKubernetesClient(servicesNamespace, k8s.AppsV1Api)
+        const { body: existing } = await client.listNamespacedDeployment(
+          deploymentObject.namespace,
+          undefined,
+          undefined,
+          undefined,
+          `metadata.name=${deploymentObject.name}`
         )
-        try {
-          const client = getKubernetesClient(servicesNamespace, k8s.AppsV1Api)
-          const { body: existing } = await client.listNamespacedStatefulSet(
-            servicesNamespace,
-            undefined,
-            undefined,
-            undefined,
-            `metadata.name=${statefulSetName}`
+        let result
+        if (existing.items.length === 1) {
+          result = await client.replaceNamespacedDeployment(
+            deploymentObject.name,
+            deploymentObject.namespace,
+            deployment
           )
-          if (existing.items.length === 1) {
-            await client.replaceNamespacedStatefulSet(
-              statefulSetName,
-              servicesNamespace,
-              statefulSet
-            )
-          } else {
-            await client.createNamespacedStatefulSet(
-              servicesNamespace,
-              statefulSet
-            )
-            res.status(201)
-          }
-        } catch (err) {
-          return handleErrorResponse(res, err)
-        }
-
-        for (const payload of servicePayloads) {
-          const serviceName = `${statefulSetName}-${payload.name}`
-          const service = makeService(
-            statefulSetName,
-            serviceName,
-            payload.ports
+        } else {
+          result = await client.createNamespacedDeployment(
+            deploymentObject.namespace,
+            deployment
           )
-          try {
-            const client = getKubernetesClient(servicesNamespace)
-            const { body: existing } = await client.listNamespacedService(
-              servicesNamespace,
-              undefined,
-              undefined,
-              undefined,
-              `metadata.name=${serviceName}`
-            )
-            if (existing.items.length === 1) {
-              await client.replaceNamespacedService(
-                serviceName,
-                servicesNamespace,
-                service
-              )
-            } else {
-              await client.createNamespacedService(servicesNamespace, service)
-              res.status(201)
-            }
-          } catch (err) {
-            return handleErrorResponse(res, err)
-          }
+          res.status(201)
         }
-
-        return deploymentData
+      } catch (err) {
+        return handleErrorResponse(res, err)
       }
-      res.status(404)
-      return { message: 'api_errors.not_found' }
+
+      return deploymentObject
+
+      // res.status(404)
+      // return { message: 'api_errors.not_found' }
     }, context)
   )
 }

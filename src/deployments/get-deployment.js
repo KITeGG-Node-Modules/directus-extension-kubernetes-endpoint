@@ -1,52 +1,57 @@
-import { baseRequestHandler } from 'kitegg-directus-extension-common'
+import {
+  baseRequestHandler,
+  getKubernetesClient,
+} from 'kitegg-directus-extension-common'
 import { handleErrorResponse } from '../lib/util.js'
+import k8s from '@kubernetes/client-node'
 
 export function getDeployment(router, context) {
   router.get(
     '/deployments/:id',
     baseRequestHandler(async (ctx) => {
-      const { req, res, user, services } = ctx
+      const { req, res, services } = ctx
       const { ItemsService } = services
-      const deploymentsService = new ItemsService('deployments', {
+      const deploymentsService = new ItemsService('k8s_deployments', {
         schema: req.schema,
         accountability: req.accountability,
       })
-      const deployment = await deploymentsService.readOne(req.params.id)
-      if (!deployment) {
+      const deploymentObject = await deploymentsService.readOne(req.params.id)
+      if (!deploymentObject) {
         res.status(404)
         return { message: 'api_errors.not_found' }
       }
       try {
-        const statefulSetName = getDeploymentName(user, deployment.id)
-        const appsClient = getKubernetesClient(servicesNamespace, k8s.AppsV1Api)
-        const coreClient = getKubernetesClient(servicesNamespace)
-        const { body: statefulSet } =
-          await appsClient.readNamespacedStatefulSet(
-            statefulSetName,
-            servicesNamespace
-          )
+        const appsClient = getKubernetesClient(
+          deploymentObject.namespace,
+          k8s.AppsV1Api
+        )
+        const coreClient = getKubernetesClient(deploymentObject.namespace)
+        const { body: deployment } = await appsClient.readNamespacedDeployment(
+          deploymentObject.name,
+          deploymentObject.namespace
+        )
         const { body: podsBody } = await coreClient.listNamespacedPod(
-          servicesNamespace,
+          deploymentObject.namespace,
           undefined,
           undefined,
           undefined,
           undefined,
-          `app=${statefulSetName}`
+          `app=${deploymentObject.name}`
         )
         const { items: pods } = podsBody
         const { body: volumeClaimsBody } =
           await coreClient.listNamespacedPersistentVolumeClaim(
-            servicesNamespace,
+            deploymentObject.namespace,
             undefined,
             undefined,
             undefined,
             undefined,
-            `app=${statefulSetName}`
+            `app=${deploymentObject.name}`
           )
         const { items: volumeClaims } = volumeClaimsBody
         return {
-          replicas: statefulSet.status.replicas,
-          currentReplicas: statefulSet.status.currentReplicas,
+          replicas: deployment.status.replicas,
+          currentReplicas: deployment.status.currentReplicas,
           pods: (pods || []).map((pod) => {
             let { containerStatuses, initContainerStatuses } = pod.status || {}
             containerStatuses = Array.isArray(containerStatuses)

@@ -13,7 +13,7 @@ export function patchDeployment(router, context) {
       const { req, res, services, user } = ctx
       const { scale } = req.query
       const { ItemsService } = services
-      const deploymentsService = new ItemsService('deployments', {
+      const deploymentsService = new ItemsService('k8s_deployments', {
         schema: req.schema,
         accountability: req.accountability,
       })
@@ -23,15 +23,14 @@ export function patchDeployment(router, context) {
         return { message: 'api_errors.not_found' }
       }
       try {
-        const statefulSetName = getDeploymentName(user, deployment.id)
-        const client = getKubernetesClient(servicesNamespace, k8s.AppsV1Api)
+        const client = getKubernetesClient(deployment.namespace, k8s.AppsV1Api)
         if (typeof scale !== 'undefined') {
-          const { body: existing } = await client.listNamespacedStatefulSet(
-            servicesNamespace,
+          const { body: existing } = await client.listNamespacedDeployment(
+						deployment.namespace,
             undefined,
             undefined,
             undefined,
-            `metadata.name=${statefulSetName}`
+            `metadata.name=${deployment.name}`
           )
           if (existing.items.length === 1) {
             const patch = [
@@ -48,9 +47,9 @@ export function patchDeployment(router, context) {
                 'Content-type': k8s.PatchUtils.PATCH_FORMAT_JSON_PATCH,
               },
             }
-            await client.patchNamespacedStatefulSetScale(
-              statefulSetName,
-              servicesNamespace,
+            await client.patchNamespacedDeploymentScale(
+							deployment.name,
+							deployment.namespace,
               patch,
               undefined,
               undefined,
