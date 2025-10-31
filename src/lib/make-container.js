@@ -1,29 +1,31 @@
 import k8s from '@kubernetes/client-node'
 
-export function makeContainer(c, servicePayloads, statefulSetName) {
+export function makeContainer(c) {
   const container = new k8s.V1Container()
   container.name = c.name
   container.image = c.image
   container.command = c.command
   container.args = c.args
+  // TODO: Make this configurable
   container.imagePullPolicy = 'Always'
+
   container.securityContext = new k8s.V1SecurityContext()
   container.securityContext.allowPrivilegeEscalation = false
 
-  if (typeof c.user === 'number') {
-    container.securityContext.runAsUser = c.user
-  }
-  if (typeof c.group === 'number') {
-    container.securityContext.runAsGroup = c.group
-  }
+  container.securityContext.runAsUser = c.securityContext?.runAsUser
+  container.securityContext.runAsGroup = c.securityContext?.runAsGroup
+  container.securityContext.fsUser = c.securityContext?.fsUser
+  container.securityContext.fsGroup = c.securityContext?.fsGroup
+  container.securityContext.fsGroupChangePolicy =
+    c.securityContext?.fsGroupChangePolicy
 
-  if (c.gpu) {
+  if (c.resources) {
     container.resources = new k8s.V1ResourceRequirements()
-    container.resources.limits = {
-      cpu: c.cpu || 4,
-      memory: `${c.memory || 32.0}Gi`,
-      [c.gpu]: c.gpuCount || 1,
-    }
+    container.resources.requests = Object.assign({}, c.resources.requests)
+    container.resources.limits = Object.assign(
+      {},
+      c.resources.limits || c.resources.requests
+    )
   }
 
   if (Array.isArray(c.ports)) {
@@ -33,27 +35,27 @@ export function makeContainer(c, servicePayloads, statefulSetName) {
       containerPort.containerPort = p.port
       return containerPort
     })
-    servicePayloads.push({ name: c.name, ports: c.ports })
   }
 
   container.env = (c.environment || []).map((e) => {
     const envVar = new k8s.V1EnvVar()
     envVar.name = e.name
-    if (e.fromSecret) {
+    if (e.valueFromSecret) {
       envVar.valueFrom = new k8s.V1EnvVarSource()
       envVar.valueFrom.secretKeyRef = new k8s.V1SecretKeySelector()
-      envVar.valueFrom.secretKeyRef.name = statefulSetName
-      envVar.valueFrom.secretKeyRef.key = e.fromSecret
-    } else if (e.fromConfig) {
+      envVar.valueFrom.secretKeyRef.name = e.valueFromSecret.name
+      envVar.valueFrom.secretKeyRef.key = e.valueFromSecret.key
+    } else if (e.valueFromConfig) {
       envVar.valueFrom = new k8s.V1EnvVarSource()
       envVar.valueFrom.configMapKeyRef = new k8s.V1ConfigMapKeySelector()
-      envVar.valueFrom.configMapKeyRef.name = statefulSetName
-      envVar.valueFrom.configMapKeyRef.key = e.fromConfig
+      envVar.valueFrom.configMapKeyRef.name = e.valueFromConfig.name
+      envVar.valueFrom.configMapKeyRef.key = e.valueFromConfig.key
     } else {
       envVar.value = e.value
     }
     return envVar
   })
+
   container.volumeMounts = (c.volumeMounts || []).map((v) => {
     const volumeMount = new k8s.V1VolumeMount()
     volumeMount.name = v.name
