@@ -1,9 +1,6 @@
-import {
-  baseRequestHandler,
-  getKubernetesClient,
-} from 'kitegg-directus-extension-common'
+import { baseRequestHandler } from 'kitegg-directus-extension-common'
 import { handleErrorResponse } from '../../lib/util.js'
-import k8s from '@kubernetes/client-node'
+import { removeDeployment } from '../../lib/operations/remove-deployment.js'
 
 export function deleteDeployment(router, context) {
   router.delete(
@@ -21,20 +18,8 @@ export function deleteDeployment(router, context) {
         return { message: 'api_errors.not_found' }
       }
       try {
-        const appsClient = getKubernetesClient(
-          deploymentObject.namespace,
-          k8s.AppsV1Api
-        )
-        await appsClient.deleteNamespacedDeployment(
-          deploymentObject.name,
-          deploymentObject.namespace,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          'Background'
-        )
-        return { deleted: deploymentObject.id }
+        const result = await removeDeployment(deploymentObject, res)
+        res.send(result)
       } catch (err) {
         return handleErrorResponse(res, err)
       }

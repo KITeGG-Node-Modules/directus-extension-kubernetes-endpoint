@@ -40,9 +40,40 @@ export function handleErrorResponse(res, err) {
   return err.message
 }
 
+export function parseErrorResponse(err) {
+  console.error(err)
+  if (err.body) {
+    return err.body.message
+  }
+  return err.message
+}
+
 export function isSuffixedVolumeName(name) {
   const regex = new RegExp(
     '^.*-sd-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[0-9]+$'
   )
   return regex.test(name)
+}
+
+export async function updateStatus(
+  services,
+  context,
+  collection,
+  key,
+  _status,
+  _errors
+) {
+  try {
+    const { ItemsService } = services
+    const deploymentsService = new ItemsService(collection, {
+      schema: context.schema,
+      accountability: context.accountability,
+    })
+    await deploymentsService.updateOne(key, {
+      _status: JSON.stringify(_status),
+      _errors: JSON.stringify(_errors),
+    })
+  } catch (err) {
+    console.error('Failed to update status for', collection, key, err.message)
+  }
 }

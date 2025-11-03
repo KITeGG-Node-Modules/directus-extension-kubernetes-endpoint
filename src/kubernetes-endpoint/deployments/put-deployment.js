@@ -1,44 +1,13 @@
-import {
-  baseRequestHandler,
-  getKubernetesClient,
-} from 'kitegg-directus-extension-common'
-import { getDeploymentName, handleErrorResponse } from '../../lib/util.js'
-import { parse } from 'yaml'
+import { baseRequestHandler } from 'kitegg-directus-extension-common'
+import { handleErrorResponse } from '../../lib/util.js'
 import { validateDeployment } from '../../lib/validations/validate-deployment.js'
-import { servicesNamespace } from '../../lib/config.js'
-import k8s from '@kubernetes/client-node'
-import { makeDeployment } from '../../lib/factories/make-deployment.js'
-
-export async function createOrReplaceDeployment() {
-  const client = getKubernetesClient(undefined, k8s.AppsV1Api)
-  const { body: existing } = await client.listNamespacedDeployment(
-    deploymentObject.namespace,
-    undefined,
-    undefined,
-    undefined,
-    `metadata.name=${deploymentObject.name}`
-  )
-  let result
-  if (existing.items.length === 1) {
-    result = await client.replaceNamespacedDeployment(
-      deploymentObject.name,
-      deploymentObject.namespace,
-      deployment
-    )
-  } else {
-    result = await client.createNamespacedDeployment(
-      deploymentObject.namespace,
-      deployment
-    )
-    res.status(201)
-  }
-}
+import { createOrReplaceDeployment } from '../../lib/operations/create-update-deployment.js'
 
 export function putDeployment(router, context) {
   router.put(
     '/deployments/:id',
     baseRequestHandler(async (ctx) => {
-      const { req, res, user, userGroups, services } = ctx
+      const { req, res, userGroups, services } = ctx
       const { ItemsService } = services
       const deploymentsService = new ItemsService('k8s_deployments', {
         schema: req.schema,
@@ -55,9 +24,8 @@ export function putDeployment(router, context) {
         res.status(400)
         return validationErrors
       }
-      const deployment = makeDeployment(deploymentObject)
       try {
-        createOrReplaceDeployment(deployment)
+        await createOrReplaceDeployment(deploymentObject, res)
       } catch (err) {
         return handleErrorResponse(res, err)
       }
