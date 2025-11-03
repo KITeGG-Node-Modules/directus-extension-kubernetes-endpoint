@@ -2,8 +2,8 @@ import {
   baseRequestHandler,
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
-import { getDeploymentName, handleErrorResponse } from '../lib/util.js'
-import { servicesNamespace } from '../lib/config.js'
+import { getDeploymentName, handleErrorResponse } from '../../lib/util.js'
+import { servicesNamespace } from '../../lib/config.js'
 import k8s from '@kubernetes/client-node'
 
 export function patchDeployment(router, context) {
@@ -26,7 +26,7 @@ export function patchDeployment(router, context) {
         const client = getKubernetesClient(deployment.namespace, k8s.AppsV1Api)
         if (typeof scale !== 'undefined') {
           const { body: existing } = await client.listNamespacedDeployment(
-						deployment.namespace,
+            deployment.namespace,
             undefined,
             undefined,
             undefined,
@@ -48,8 +48,8 @@ export function patchDeployment(router, context) {
               },
             }
             await client.patchNamespacedDeploymentScale(
-							deployment.name,
-							deployment.namespace,
+              deployment.name,
+              deployment.namespace,
               patch,
               undefined,
               undefined,

@@ -2,10 +2,10 @@ import {
   baseRequestHandler,
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
-import { getDeploymentName, handleErrorResponse } from '../lib/util.js'
+import { getDeploymentName, handleErrorResponse } from '../../lib/util.js'
 import { parse } from 'yaml'
-import { makeConfigMap } from '../lib/make-config-map.js'
-import { servicesNamespace } from '../lib/config.js'
+import { makeConfigMap } from '../../lib/factories/make-config-map.js'
+import { servicesNamespace } from '../../lib/config.js'
 
 export function putConfig(router, context) {
   router.put(

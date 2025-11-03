@@ -2,8 +2,8 @@ import {
   baseRequestHandler,
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
-import { getDeploymentName, handleErrorResponse } from '../lib/util.js'
-import { servicesNamespace } from '../lib/config.js'
+import { getDeploymentName, handleErrorResponse } from '../../lib/util.js'
+import { servicesNamespace } from '../../lib/config.js'
 import k8s from '@kubernetes/client-node'
 import { DateTime } from 'luxon'
 

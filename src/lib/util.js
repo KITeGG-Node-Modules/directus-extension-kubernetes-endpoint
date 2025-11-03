@@ -14,6 +14,22 @@ export function getDeploymentName(user, name) {
   return `sd-${nameSlug}`
 }
 
+export const NAMESPACE_PREFIX = 'user-'
+export const UUID_LENGTH = 36
+export const NAMESPACE_PREFIX_FULL_LENGTH =
+  NAMESPACE_PREFIX.length + UUID_LENGTH + 1
+
+export function getNamespace(user, namespace) {
+  return `user-${user.id}-${namespace}`
+}
+
+export function parseNamespace(namespace) {
+  return {
+    user: namespace.slice(NAMESPACE_PREFIX.length, UUID_LENGTH),
+    name: namespace.slice(NAMESPACE_PREFIX_FULL_LENGTH),
+  }
+}
+
 export function handleErrorResponse(res, err) {
   if (err.body) {
     res.status(err.body.code)

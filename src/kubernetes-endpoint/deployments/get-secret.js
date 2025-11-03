@@ -2,12 +2,12 @@ import {
   baseRequestHandler,
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
-import { getDeploymentName, handleErrorResponse } from '../lib/util.js'
-import { servicesNamespace } from '../lib/config.js'
+import { getDeploymentName, handleErrorResponse } from '../../lib/util.js'
+import { servicesNamespace } from '../../lib/config.js'
 
-export function getConfig(router, context) {
+export function getSecret(router, context) {
   router.get(
-    '/deployments/:id/config',
+    '/deployments/:id/secret',
     baseRequestHandler(async (ctx) => {
       const { req, res, services, user } = ctx
       const { ItemsService } = services
@@ -23,11 +23,16 @@ export function getConfig(router, context) {
       try {
         const statefulSetName = getDeploymentName(user, deployment.id)
         const coreClient = getKubernetesClient(servicesNamespace)
-        const configMap = await coreClient.readNamespacedConfigMap(
+        const secret = await coreClient.readNamespacedSecret(
           statefulSetName,
           servicesNamespace
         )
-        return { data: configMap.body.data }
+        const secretData = secret.body.data
+        for (const key in secretData) {
+          const buffer = Buffer.from(secretData[key], 'base64')
+          secretData[key] = buffer.toString()
+        }
+        return { data: secretData }
       } catch (err) {
         return handleErrorResponse(res, err)
       }

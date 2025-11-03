@@ -1,9 +1,9 @@
 import k8s from '@kubernetes/client-node'
-import { servicesNamespace } from './config.js'
+import { servicesNamespace } from '../config.js'
 import { DateTime } from 'luxon'
 import { makeVolumeClaim } from './make-volume-claim.js'
 import { makeContainer } from './make-container.js'
-import { isSuffixedVolumeName } from './util.js'
+import { isSuffixedVolumeName } from '../util.js'
 
 export function makeStatefulSet(name, deployment) {
   const servicePayloads = []

@@ -1,4 +1,4 @@
-# KITeGG Kubernetes Endpoint
+# KITeGG Kubernetes Bundle
 
 > K8S control interface for the LLP
 

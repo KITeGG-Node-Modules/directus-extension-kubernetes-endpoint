@@ -2,10 +2,10 @@ import {
   baseRequestHandler,
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
-import { getDeploymentName, handleErrorResponse } from '../lib/util.js'
+import { getDeploymentName, handleErrorResponse } from '../../lib/util.js'
 import { parse } from 'yaml'
-import { makeSecret } from '../lib/make-secret.js'
-import { servicesNamespace } from '../lib/config.js'
+import { makeSecret } from '../../lib/factories/make-secret.js'
+import { servicesNamespace } from '../../lib/config.js'
 
 export function putSecret(router, context) {
   router.put(

@@ -1,5 +1,5 @@
 import k8s from '@kubernetes/client-node'
-import { servicesNamespace } from './config.js'
+import { servicesNamespace } from '../config.js'
 
 export function makeService(statefulSetName, name, ports) {
   const servicePayload = new k8s.V1Service()

@@ -2,7 +2,7 @@ import {
   baseRequestHandler,
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
-import { handleErrorResponse } from '../lib/util.js'
+import { handleErrorResponse } from '../../lib/util.js'
 import k8s from '@kubernetes/client-node'
 
 export function getDeployment(router, context) {

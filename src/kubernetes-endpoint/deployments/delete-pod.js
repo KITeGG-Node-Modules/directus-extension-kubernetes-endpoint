@@ -2,8 +2,8 @@ import {
   baseRequestHandler,
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
-import { servicesNamespace } from '../lib/config.js'
-import { handleErrorResponse } from '../lib/util.js'
+import { servicesNamespace } from '../../lib/config.js'
+import { handleErrorResponse } from '../../lib/util.js'
 
 export function deletePod(router, context) {
   router.delete(
