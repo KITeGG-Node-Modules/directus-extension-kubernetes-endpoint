@@ -60,7 +60,14 @@ export function makeStatefulSet(name, deployment) {
 
   podSpec.volumes = (deployment.volumes || [])
     .map((v) => {
-      if (isSuffixedVolumeName(v.name)) {
+      if (v.emptyDir?.sizeLimit) {
+        const volume = new k8s.V1Volume()
+        volume.name = v.name
+        volume.emptyDir = new k8s.V1EmptyDirVolumeSource()
+        volume.emptyDir.sizeLimit = v.emptyDir.sizeLimit
+        volume.emptyDir.medium = 'Memory'
+        return volume
+      } else if (isSuffixedVolumeName(v.name)) {
         const volume = new k8s.V1Volume()
         volume.name = v.name
         volume.persistentVolumeClaim =
@@ -80,9 +87,10 @@ export function makeStatefulSet(name, deployment) {
     .map((v) => {
       if (isSuffixedVolumeName(v.name)) {
         return null
-      } else {
+      } else if (v.size) {
         return makeVolumeClaim(v)
       }
+      return null
     })
     .filter((v) => !!v)
 
