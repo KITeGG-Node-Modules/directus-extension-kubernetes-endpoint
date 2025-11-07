@@ -8,6 +8,9 @@ export function makeDeployment(payload) {
   const metadata = new k8s.V1ObjectMeta()
   metadata.name = payload.name
   metadata.namespace = payload.namespace
+  metadata.labels = {
+    'llp.kitegg.de/objectId': payload.id,
+  }
   deployment.metadata = metadata
 
   const spec = new k8s.V1DeploymentSpec()
