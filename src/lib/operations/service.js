@@ -1,6 +1,7 @@
 import { getKubernetesClient } from 'kitegg-directus-extension-common'
 import k8s from '@kubernetes/client-node'
 import { makeService } from '../factories/service.js'
+import { LABEL_NAMESPACE } from '../config.js'
 
 export async function createOrReplaceService(object, res = undefined) {
   const payload = makeService(object)
@@ -32,7 +33,7 @@ export async function removeService(id) {
     undefined,
     undefined,
     undefined,
-    `llp.kitegg.de/objectId=${id}`,
+    `${LABEL_NAMESPACE}/objectId=${id}`,
     1
   )
   if (existing.items.length > 0) {

@@ -1,6 +1,7 @@
 import k8s from '@kubernetes/client-node'
-import { genericMetadata, LABEL_NAMESPACE } from '../util.js'
+import { genericMetadata } from '../util.js'
 import { getKubernetesClient } from 'kitegg-directus-extension-common'
+import { LABEL_NAMESPACE } from '../config.js'
 
 export function makeVolumeClaim(payload) {
   const volumeClaim = new k8s.V1PersistentVolumeClaim()

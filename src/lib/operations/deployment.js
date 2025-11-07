@@ -1,6 +1,7 @@
 import { makeDeployment } from '../factories/deployment.js'
 import { getKubernetesClient } from 'kitegg-directus-extension-common'
 import k8s from '@kubernetes/client-node'
+import { LABEL_NAMESPACE } from '../config.js'
 
 export async function createOrReplaceDeployment(
   deploymentObject,
@@ -38,7 +39,7 @@ export async function removeDeployment(id) {
     undefined,
     undefined,
     undefined,
-    `llp.kitegg.de/objectId=${id}`,
+    `${LABEL_NAMESPACE}/objectId=${id}`,
     1
   )
   if (existing.items.length > 0) {

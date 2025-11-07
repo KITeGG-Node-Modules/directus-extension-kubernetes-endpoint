@@ -1,6 +1,7 @@
 import { getKubernetesClient } from 'kitegg-directus-extension-common'
 import k8s from '@kubernetes/client-node'
 import { makeConfigMap } from '../factories/config-map.js'
+import { LABEL_NAMESPACE } from '../config.js'
 
 export async function createOrReplaceConfigMap(object, res = undefined) {
   const payload = makeConfigMap(object)
@@ -32,7 +33,7 @@ export async function removeConfigMap(id) {
     undefined,
     undefined,
     undefined,
-    `llp.kitegg.de/objectId=${id}`,
+    `${LABEL_NAMESPACE}/objectId=${id}`,
     1
   )
   if (existing.items.length > 0) {
