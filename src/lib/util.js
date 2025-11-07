@@ -112,11 +112,11 @@ export function genericFilter(args, key, validateFunc) {
   const [{ filter }] = args
 
   filter(`${key}.create`, async (payload) => {
-    genericValidation(payload, validateContainer)
+    genericValidation(payload, validateFunc)
   })
 
   filter(`${key}.update`, async (payload) => {
-    genericValidation(payload, validateContainer)
+    genericValidation(payload, validateFunc)
   })
 }
 
