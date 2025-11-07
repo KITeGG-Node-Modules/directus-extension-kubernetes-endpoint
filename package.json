@@ -42,6 +42,7 @@
 		"prettier": "^3.2.5"
 	},
 	"dependencies": {
+		"@directus/errors": "^2.0.5",
 		"@kubernetes/client-node": "0.18.1",
 		"kitegg-directus-extension-common": "github:KITeGG-Node-Modules/kitegg-directus-extension-common",
 		"luxon": "^3.4.4",

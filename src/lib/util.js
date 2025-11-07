@@ -6,6 +6,8 @@ import {
   NAMESPACE_PREFIX_FULL_LENGTH,
   UUID_LENGTH,
 } from './config.js'
+import { createError } from '@directus/errors'
+import { validateContainer } from './validations/container.js'
 
 export function getNameSlug(name) {
   return slugify(name, {
@@ -66,6 +68,25 @@ export function genericMetadata(payload) {
   return metadata
 }
 
+export function genericValidation(payload, validateFunc) {
+  const result = validateFunc(payload)
+  if (result.length > 0) {
+    const errors = result
+      .reduce((acc, curr) => {
+        acc.push(
+          Object.keys(curr)
+            .map((key) => `${key}: ${curr[key]}`)
+            .join(', ')
+        )
+        return acc
+      }, [])
+      .join('; ')
+    const message = `Validation failed: ${errors}`
+    const CreateError = createError('BAD_REQUEST', message, 400)
+    throw new CreateError()
+  }
+}
+
 export function genericAction(args, key, k8sProps, createFunc, removeFunc) {
   const [{ action }, { services }] = args
 
@@ -84,6 +105,18 @@ export function genericAction(args, key, k8sProps, createFunc, removeFunc) {
 
   action(`${key}.delete`, async (meta, context) => {
     await forwardToKubernetes(services, meta, context, removeFunc)
+  })
+}
+
+export function genericFilter(args, key, validateFunc) {
+  const [{ filter }] = args
+
+  filter(`${key}.create`, async (payload) => {
+    genericValidation(payload, validateContainer)
+  })
+
+  filter(`${key}.update`, async (payload) => {
+    genericValidation(payload, validateContainer)
   })
 }
 

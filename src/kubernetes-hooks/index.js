@@ -1,4 +1,4 @@
-import { genericAction } from '../lib/util.js'
+import { genericAction, genericFilter } from '../lib/util.js'
 
 import {
   createOrReplaceDeployment,
@@ -20,11 +20,21 @@ import {
   createOrReplaceConfigMap,
   removeConfigMap,
 } from '../lib/operations/config-map.js'
+import { validateContainer } from '../lib/validations/container.js'
 
 export default (...args) => {
   //
   // Deployments
 
+  genericFilter(args, 'k8s_deployments.items', (payload) => {
+    let containerErrors = []
+    for (const container of payload.containers) {
+      containerErrors = containerErrors.concat(
+        validateContainer(container) || []
+      )
+    }
+    return containerErrors
+  })
   genericAction(
     args,
     'k8s_deployments.items',
