@@ -1,7 +1,7 @@
 import { baseRequestHandler } from 'kitegg-directus-extension-common'
 import { handleErrorResponse } from '../../lib/util.js'
 import { validateDeployment } from '../../lib/validations/validate-deployment.js'
-import { createOrReplaceDeployment } from '../../lib/operations/create-update-deployment.js'
+import { createOrReplaceDeployment } from '../../lib/operations/create-replace-deployment.js'
 
 export function putDeployment(router, context) {
   router.put(
