@@ -1,4 +1,12 @@
 import slugify from 'slugify'
+import k8s from '@kubernetes/client-node'
+
+export const LABEL_NAMESPACE = 'llp.kitegg.de'
+
+export const NAMESPACE_PREFIX = 'user-'
+export const UUID_LENGTH = 36
+export const NAMESPACE_PREFIX_FULL_LENGTH =
+  NAMESPACE_PREFIX.length + UUID_LENGTH + 1
 
 export function getNameSlug(name) {
   return slugify(name, {
@@ -13,11 +21,6 @@ export function getDeploymentName(user, name) {
   const nameSlug = getNameSlug(name)
   return `sd-${nameSlug}`
 }
-
-export const NAMESPACE_PREFIX = 'user-'
-export const UUID_LENGTH = 36
-export const NAMESPACE_PREFIX_FULL_LENGTH =
-  NAMESPACE_PREFIX.length + UUID_LENGTH + 1
 
 export function getNamespace(user, namespace) {
   return `user-${user.id}-${namespace}`
@@ -42,10 +45,8 @@ export function handleErrorResponse(res, err) {
 
 export function parseErrorResponse(err) {
   console.error(err)
-  if (err.body) {
-    return err.body.message
-  }
-  return err.message
+  if (err.body) return err.body
+  return { message: err.message }
 }
 
 export function isSuffixedVolumeName(name) {
@@ -53,6 +54,17 @@ export function isSuffixedVolumeName(name) {
     '^.*-sd-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[0-9]+$'
   )
   return regex.test(name)
+}
+
+export function genericMetadata(payload) {
+  const metadata = new k8s.V1ObjectMeta()
+  metadata.name = payload.name
+  metadata.namespace = payload.namespace
+  metadata.labels = {
+    [`${LABEL_NAMESPACE}/objectId`]: payload.id,
+    [`${LABEL_NAMESPACE}/userId`]: payload.user_created,
+  }
+  return metadata
 }
 
 export async function updateStatus(
@@ -76,5 +88,39 @@ export async function updateStatus(
     await deploymentsService.updateOne(key, payload)
   } catch (err) {
     console.error('Failed to update status for', collection, key, err.message)
+  }
+}
+
+export async function forwardToKubernetes(
+  services,
+  meta,
+  context,
+  handlerFunction
+) {
+  const { key, keys, collection } = meta
+  let ids
+  if (key && !keys) {
+    ids = [key]
+  } else {
+    ids = keys
+  }
+  for (const id of ids) {
+    let _status, _errors, object
+    try {
+      const { ItemsService } = services
+      const service = new ItemsService(collection, {
+        schema: context.schema,
+        accountability: context.accountability,
+      })
+      object = await service.readOne(id)
+    } catch {}
+    try {
+      _status = await handlerFunction(object || id)
+      _errors = null
+    } catch (err) {
+      _status = null
+      _errors = parseErrorResponse(err)
+    }
+    await updateStatus(services, context, collection, id, _status, _errors)
   }
 }
