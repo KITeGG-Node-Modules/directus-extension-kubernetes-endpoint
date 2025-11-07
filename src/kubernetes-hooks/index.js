@@ -16,15 +16,17 @@ export async function forwardToKubernetes(
     ids = keys
   }
   for (const id of ids) {
-    let _status, _errors
+    let _status, _errors, object
     try {
       const { ItemsService } = services
       const service = new ItemsService(collection, {
         schema: context.schema,
         accountability: context.accountability,
       })
-      const object = await service.readOne(id)
-      _status = await handlerFunction(object)
+      object = await service.readOne(id)
+    } catch {}
+    try {
+      _status = await handlerFunction(object || id)
       _errors = null
     } catch (err) {
       _status = null
@@ -45,14 +47,18 @@ export default ({ action }, { services }) => {
   })
 
   action('k8s_deployments.items.update', async (meta, context) => {
-    if (!meta.payload._status && !meta.payload._errors) {
+    const k8sProps = ['containers', 'podName']
+    const needsDeploy = Object.keys(meta.payload).reduce(
+      (result, key) => result || k8sProps.includes(key),
+      false
+    )
+    if (needsDeploy)
       await forwardToKubernetes(
         services,
         meta,
         context,
         createOrReplaceDeployment
       )
-    }
   })
 
   action('k8s_deployments.items.delete', async (meta, context) => {

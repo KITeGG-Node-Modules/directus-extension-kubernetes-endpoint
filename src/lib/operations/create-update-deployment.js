@@ -29,5 +29,5 @@ export async function createOrReplaceDeployment(
     )
     if (res) res.status(201)
   }
-  return result
+  if (result.response) return result.response.body
 }
