@@ -71,10 +71,6 @@ export function validateDeployment(deployment, userGroups = []) {
           },
           size: {
             type: 'string',
-            format: {
-              pattern: '^\\d{1,3}(?:Mi|Gi){1}$',
-              message: 'must be one to three digits followed by Mi or Gi',
-            },
           },
           'emptyDir.sizeLimit': {
             type: 'number',
