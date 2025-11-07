@@ -64,7 +64,7 @@ export function makeStatefulSet(name, deployment) {
         const volume = new k8s.V1Volume()
         volume.name = v.name
         volume.emptyDir = new k8s.V1EmptyDirVolumeSource()
-        volume.emptyDir.sizeLimit = v.emptyDir.sizeLimit
+        volume.emptyDir.sizeLimit = `${v.emptyDir.sizeLimit}Mi`
         volume.emptyDir.medium = 'Memory'
         return volume
       } else if (isSuffixedVolumeName(v.name)) {
