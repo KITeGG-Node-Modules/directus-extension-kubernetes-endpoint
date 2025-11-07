@@ -27,13 +27,15 @@ export default (...args) => {
   // Deployments
 
   genericFilter(args, 'k8s_deployments.items', (payload) => {
-    let containerErrors = []
-    for (const container of payload.containers) {
-      containerErrors = containerErrors.concat(
-        validateContainer(container) || []
-      )
+    if (payload.containers) {
+      let containerErrors = []
+      for (const container of payload.containers) {
+        containerErrors = containerErrors.concat(
+          validateContainer(container) || []
+        )
+      }
+      return containerErrors
     }
-    return containerErrors
   })
   genericAction(
     args,
