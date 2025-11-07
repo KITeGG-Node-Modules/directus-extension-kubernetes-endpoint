@@ -6,10 +6,11 @@ import { getNamespace, handleErrorResponse } from '../../lib/util.js'
 import k8s from '@kubernetes/client-node'
 import { validateNamespace } from '../../lib/validations/namespace.js'
 import { makeNamespace } from '../../lib/factories/namespace.js'
+import { ROUTE_PREFIX } from '../../lib/config.js'
 
 export function putNamespace(router, context) {
   router.put(
-    '/namespaces/:id',
+    `${ROUTE_PREFIX}/namespaces/:id`,
     baseRequestHandler(async (ctx) => {
       const { req, res, user, services } = ctx
       const { ItemsService } = services

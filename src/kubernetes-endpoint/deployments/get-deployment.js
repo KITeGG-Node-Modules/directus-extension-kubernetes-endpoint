@@ -4,10 +4,11 @@ import {
 } from 'kitegg-directus-extension-common'
 import { handleErrorResponse } from '../../lib/util.js'
 import k8s from '@kubernetes/client-node'
+import { ROUTE_PREFIX } from '../../lib/config.js'
 
 export function getDeployment(router, context) {
   router.get(
-    '/deployments/:id',
+    `${ROUTE_PREFIX}/deployments/:id`,
     baseRequestHandler(async (ctx) => {
       const { req, res, services } = ctx
       const { ItemsService } = services

@@ -1,4 +1,5 @@
 import { baseRequestHandler } from 'kitegg-directus-extension-common'
+import { ROUTE_PREFIX } from '../../lib/config.js'
 
 export function mapResourceNames(resourceName) {
   switch (resourceName) {
@@ -59,7 +60,7 @@ export async function getWorkers() {
 
 export function getCapacity(router, context) {
   router.get(
-    '/capacity',
+    `${ROUTE_PREFIX}/capacity`,
     baseRequestHandler(async () => {
       const workers = await getWorkers()
       const results = []

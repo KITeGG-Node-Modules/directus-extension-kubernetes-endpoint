@@ -3,13 +3,13 @@ import {
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
 import { getDeploymentName, handleErrorResponse } from '../../lib/util.js'
-import { servicesNamespace } from '../../lib/config.js'
+import { ROUTE_PREFIX, servicesNamespace } from '../../lib/config.js'
 import k8s from '@kubernetes/client-node'
 import { DateTime } from 'luxon'
 
 export function restartDeployment(router, context) {
   router.get(
-    '/deployments/:id/hooks/restart',
+    `${ROUTE_PREFIX}/deployments/:id/hooks/restart`,
     baseRequestHandler(async (ctx) => {
       const { req, res, user, services } = ctx
       const { ItemsService } = services

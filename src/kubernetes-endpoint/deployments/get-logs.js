@@ -2,12 +2,12 @@ import {
   baseRequestHandler,
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
-import { servicesNamespace } from '../../lib/config.js'
+import { ROUTE_PREFIX, servicesNamespace } from '../../lib/config.js'
 import { handleErrorResponse } from '../../lib/util.js'
 
 export function getLogs(router, context) {
   router.get(
-    '/deployments/:id/logs/:podName',
+    `${ROUTE_PREFIX}/deployments/:id/logs/:podName`,
     baseRequestHandler(async (ctx) => {
       const { req, res, services } = ctx
       const { podName } = req.params

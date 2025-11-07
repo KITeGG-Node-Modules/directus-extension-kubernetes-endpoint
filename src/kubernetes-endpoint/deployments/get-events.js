@@ -3,12 +3,12 @@ import {
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
 import { handleErrorResponse } from '../../lib/util.js'
-import { servicesNamespace } from '../../lib/config.js'
+import { ROUTE_PREFIX, servicesNamespace } from '../../lib/config.js'
 import k8s from '@kubernetes/client-node'
 
 export function getEvents(router, context) {
   router.get(
-    '/deployments/:id/events/:podName',
+    `${ROUTE_PREFIX}/deployments/:id/events/:podName`,
     baseRequestHandler(async (ctx) => {
       const { req, res, services } = ctx
       const { podName } = req.params

@@ -4,10 +4,11 @@ import {
 } from 'kitegg-directus-extension-common'
 import { getNamespace, handleErrorResponse } from '../../lib/util.js'
 import k8s from '@kubernetes/client-node'
+import { ROUTE_PREFIX } from '../../lib/config.js'
 
 export function deleteNamespace(router, context) {
   router.delete(
-    '/namespaces/:id',
+    `${ROUTE_PREFIX}/namespaces/:id`,
     baseRequestHandler(async (ctx) => {
       const { req, res, user, services } = ctx
       const { ItemsService } = services
