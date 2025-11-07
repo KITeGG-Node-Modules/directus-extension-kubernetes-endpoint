@@ -1,12 +1,11 @@
 import slugify from 'slugify'
 import k8s from '@kubernetes/client-node'
-
-export const LABEL_NAMESPACE = 'llp.kitegg.de'
-
-export const NAMESPACE_PREFIX = 'user-'
-export const UUID_LENGTH = 36
-export const NAMESPACE_PREFIX_FULL_LENGTH =
-  NAMESPACE_PREFIX.length + UUID_LENGTH + 1
+import {
+  LABEL_NAMESPACE,
+  NAMESPACE_PREFIX,
+  NAMESPACE_PREFIX_FULL_LENGTH,
+  UUID_LENGTH,
+} from './config.js'
 
 export function getNameSlug(name) {
   return slugify(name, {
@@ -65,6 +64,27 @@ export function genericMetadata(payload) {
     [`${LABEL_NAMESPACE}/userId`]: payload.user_created,
   }
   return metadata
+}
+
+export function genericAction(args, key, k8sProps, createFunc, removeFunc) {
+  const [{ action }, { services }] = args
+
+  action(`${key}.create`, async (meta, context) => {
+    await forwardToKubernetes(services, meta, context, createFunc)
+  })
+
+  action(`${key}.update`, async (meta, context) => {
+    const needsDeploy = Object.keys(meta.payload).reduce(
+      (result, key) => result || k8sProps.includes(key),
+      false
+    )
+    if (needsDeploy)
+      await forwardToKubernetes(services, meta, context, createFunc)
+  })
+
+  action(`${key}.delete`, async (meta, context) => {
+    await forwardToKubernetes(services, meta, context, removeFunc)
+  })
 }
 
 export async function updateStatus(

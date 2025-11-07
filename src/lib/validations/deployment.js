@@ -1,5 +1,5 @@
 import validate from 'validate.js'
-import { validateContainer } from './validate-container.js'
+import { validateContainer } from './container.js'
 
 export function validateDeployment(deployment, userGroups = []) {
   let validationErrors = []

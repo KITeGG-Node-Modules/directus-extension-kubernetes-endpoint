@@ -1,35 +1,25 @@
-import { createOrReplaceDeployment } from '../lib/operations/create-replace-deployment.js'
-import { forwardToKubernetes } from '../lib/util.js'
-import { removeDeployment } from '../lib/operations/remove-deployment.js'
-import { createOrReplaceService } from '../lib/operations/create-replace-service.js'
-import { removeService } from '../lib/operations/remove-service.js'
-import { createOrReplaceVolumeClaim } from '../lib/operations/create-replace-volume-claim.js'
-import { removeVolumeClaim } from '../lib/operations/remove-volume-claim.js'
-import { createOrReplaceSecret } from '../lib/operations/create-replace-secret.js'
-import { removeSecret } from '../lib/operations/remove-secret.js'
-import { createOrReplaceConfigMap } from '../lib/operations/create-replace-config-map.js'
-import { removeConfigMap } from '../lib/operations/remove-config-map.js'
+import { genericAction } from '../lib/util.js'
 
-function genericAction(args, key, k8sProps, createFunc, removeFunc) {
-  const [{ action }, { services }] = args
-
-  action(`${key}.create`, async (meta, context) => {
-    await forwardToKubernetes(services, meta, context, createFunc)
-  })
-
-  action(`${key}.update`, async (meta, context) => {
-    const needsDeploy = Object.keys(meta.payload).reduce(
-      (result, key) => result || k8sProps.includes(key),
-      false
-    )
-    if (needsDeploy)
-      await forwardToKubernetes(services, meta, context, createFunc)
-  })
-
-  action(`${key}.delete`, async (meta, context) => {
-    await forwardToKubernetes(services, meta, context, removeFunc)
-  })
-}
+import {
+  createOrReplaceDeployment,
+  removeDeployment,
+} from '../lib/operations/deployment.js'
+import {
+  createOrReplaceService,
+  removeService,
+} from '../lib/operations/service.js'
+import {
+  createOrReplaceVolumeClaim,
+  removeVolumeClaim,
+} from '../lib/operations/volume-claim.js'
+import {
+  createOrReplaceSecret,
+  removeSecret,
+} from '../lib/operations/secret.js'
+import {
+  createOrReplaceConfigMap,
+  removeConfigMap,
+} from '../lib/operations/config-map.js'
 
 export default (...args) => {
   //

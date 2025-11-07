@@ -1,6 +1,19 @@
-import { getKubernetesClient } from 'kitegg-directus-extension-common'
 import k8s from '@kubernetes/client-node'
-import { LABEL_NAMESPACE } from '../util.js'
+import { genericMetadata, LABEL_NAMESPACE } from '../util.js'
+import { getKubernetesClient } from 'kitegg-directus-extension-common'
+
+export function makeVolumeClaim(payload) {
+  const volumeClaim = new k8s.V1PersistentVolumeClaim()
+  volumeClaim.metadata = genericMetadata(payload)
+  volumeClaim.spec = new k8s.V1PersistentVolumeClaimSpec()
+  volumeClaim.spec.storageClassName = 'longhorn'
+  volumeClaim.spec.accessModes = [payload.mountType || 'ReadWriteOnce']
+  volumeClaim.spec.resources = new k8s.V1ResourceRequirements()
+  volumeClaim.spec.resources.requests = {
+    storage: payload.size,
+  }
+  return volumeClaim
+}
 
 export async function removeVolumeClaim(id, res = undefined) {
   const client = getKubernetesClient(undefined, k8s.CoreV1Api)

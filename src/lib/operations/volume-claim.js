@@ -1,6 +1,7 @@
 import { getKubernetesClient } from 'kitegg-directus-extension-common'
 import k8s from '@kubernetes/client-node'
-import { makeVolumeClaim } from '../factories/make-volume-claim.js'
+import { makeVolumeClaim } from '../factories/volume-claim.js'
+import { LABEL_NAMESPACE } from '../util.js'
 
 export async function createOrReplaceVolumeClaim(object, res = undefined) {
   const payload = makeVolumeClaim(object)
@@ -27,4 +28,29 @@ export async function createOrReplaceVolumeClaim(object, res = undefined) {
     if (res) res.status(201)
   }
   if (result.response) return result.response.body
+}
+
+export async function removeVolumeClaim(id) {
+  const client = getKubernetesClient(undefined, k8s.CoreV1Api)
+  const { body: existing } =
+    await client.listPersistentVolumeClaimForAllNamespaces(
+      undefined,
+      undefined,
+      undefined,
+      `${LABEL_NAMESPACE}/objectId=${id}`
+    )
+  if (existing.items.length > 0) {
+    for (const item of existing.items) {
+      await client.deleteNamespacedPersistentVolumeClaim(
+        item.metadata.name,
+        item.metadata.namespace,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'Background'
+      )
+    }
+  }
+  return { deleted: id }
 }

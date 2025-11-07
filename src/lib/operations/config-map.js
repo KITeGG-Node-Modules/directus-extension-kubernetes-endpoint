@@ -1,6 +1,6 @@
 import { getKubernetesClient } from 'kitegg-directus-extension-common'
 import k8s from '@kubernetes/client-node'
-import { makeConfigMap } from '../factories/make-config-map.js'
+import { makeConfigMap } from '../factories/config-map.js'
 
 export async function createOrReplaceConfigMap(object, res = undefined) {
   const payload = makeConfigMap(object)
@@ -24,4 +24,29 @@ export async function createOrReplaceConfigMap(object, res = undefined) {
     if (res) res.status(201)
   }
   if (result.response) return result.response.body
+}
+
+export async function removeConfigMap(id) {
+  const appsClient = getKubernetesClient(undefined, k8s.CoreV1Api)
+  const { body: existing } = await appsClient.listConfigMapForAllNamespaces(
+    undefined,
+    undefined,
+    undefined,
+    `llp.kitegg.de/objectId=${id}`,
+    1
+  )
+  if (existing.items.length > 0) {
+    for (const item of existing.items) {
+      await appsClient.deleteNamespacedConfigMap(
+        item.metadata.name,
+        item.metadata.namespace,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'Background'
+      )
+    }
+  }
+  return { deleted: id }
 }

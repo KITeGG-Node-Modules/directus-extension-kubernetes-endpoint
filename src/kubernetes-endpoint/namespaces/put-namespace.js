@@ -4,8 +4,8 @@ import {
 } from 'kitegg-directus-extension-common'
 import { getNamespace, handleErrorResponse } from '../../lib/util.js'
 import k8s from '@kubernetes/client-node'
-import { validateNamespace } from '../../lib/validations/validate-namespace.js'
-import { makeNamespace } from '../../lib/factories/make-namespace.js'
+import { validateNamespace } from '../../lib/validations/namespace.js'
+import { makeNamespace } from '../../lib/factories/namespace.js'
 
 export function putNamespace(router, context) {
   router.put(
