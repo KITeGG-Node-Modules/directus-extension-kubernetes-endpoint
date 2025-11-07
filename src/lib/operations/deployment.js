@@ -3,32 +3,28 @@ import { getKubernetesClient } from 'kitegg-directus-extension-common'
 import k8s from '@kubernetes/client-node'
 import { LABEL_NAMESPACE } from '../config.js'
 
-export async function createOrReplaceDeployment(
-  deploymentObject,
-  res = undefined
-) {
-  const deployment = makeDeployment(deploymentObject)
+export async function createOrReplaceDeployment(deploymentObject, userId) {
+  const payload = makeDeployment(deploymentObject, userId)
   const client = getKubernetesClient(undefined, k8s.AppsV1Api)
   const { body: existing } = await client.listNamespacedDeployment(
-    deploymentObject.namespace,
+    payload.metadata.namespace,
     undefined,
     undefined,
     undefined,
-    `metadata.name=${deploymentObject.name}`
+    `metadata.name=${payload.metadata.name}`
   )
   let result
   if (existing.items.length === 1) {
     result = await client.replaceNamespacedDeployment(
-      deploymentObject.name,
-      deploymentObject.namespace,
-      deployment
+      payload.metadata.name,
+      payload.metadata.namespace,
+      payload
     )
   } else {
     result = await client.createNamespacedDeployment(
-      deploymentObject.namespace,
-      deployment
+      payload.metadata.namespace,
+      payload
     )
-    if (res) res.status(201)
   }
   if (result.response) return result.response.body
 }

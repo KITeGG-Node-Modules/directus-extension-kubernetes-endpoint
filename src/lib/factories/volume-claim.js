@@ -3,9 +3,9 @@ import { genericMetadata } from '../util.js'
 import { getKubernetesClient } from 'kitegg-directus-extension-common'
 import { LABEL_NAMESPACE } from '../config.js'
 
-export function makeVolumeClaim(payload) {
+export function makeVolumeClaim(payload, userId) {
   const volumeClaim = new k8s.V1PersistentVolumeClaim()
-  volumeClaim.metadata = genericMetadata(payload)
+  volumeClaim.metadata = genericMetadata(payload, userId)
   volumeClaim.spec = new k8s.V1PersistentVolumeClaimSpec()
   volumeClaim.spec.storageClassName = 'longhorn'
   volumeClaim.spec.accessModes = [payload.mountType || 'ReadWriteOnce']

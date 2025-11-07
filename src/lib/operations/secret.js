@@ -3,26 +3,28 @@ import k8s from '@kubernetes/client-node'
 import { makeSecret } from '../factories/secret.js'
 import { LABEL_NAMESPACE } from '../config.js'
 
-export async function createOrReplaceSecret(object, res = undefined) {
-  const payload = makeSecret(object)
+export async function createOrReplaceSecret(object, userId) {
+  const payload = makeSecret(object, userId)
   const client = getKubernetesClient(undefined, k8s.CoreV1Api)
   const { body: existing } = await client.listNamespacedSecret(
-    object.namespace,
+    payload.metadata.namespace,
     undefined,
     undefined,
     undefined,
-    `metadata.name=${object.name}`
+    `metadata.name=${payload.metadata.name}`
   )
   let result
   if (existing.items.length === 1) {
     result = await client.replaceNamespacedSecret(
-      object.name,
-      object.namespace,
+      payload.metadata.name,
+      payload.metadata.namespace,
       payload
     )
   } else {
-    result = await client.createNamespacedSecret(object.namespace, payload)
-    if (res) res.status(201)
+    result = await client.createNamespacedSecret(
+      payload.metadata.namespace,
+      payload
+    )
   }
   if (result.response) return result.response.body
 }

@@ -22,8 +22,8 @@ export function getDeploymentName(user, name) {
   return `sd-${nameSlug}`
 }
 
-export function getNamespace(user, namespace) {
-  return `user-${user.id}-${namespace}`
+export function getNamespace(userId, namespace) {
+  return `${NAMESPACE_PREFIX}${userId}-${namespace}`
 }
 
 export function parseNamespace(namespace) {
@@ -56,14 +56,17 @@ export function isSuffixedVolumeName(name) {
   return regex.test(name)
 }
 
-export function genericMetadata(payload) {
+export function genericMetadata(payload, userId) {
   const metadata = new k8s.V1ObjectMeta()
   metadata.name = payload.name
-  metadata.namespace = payload.namespace
-  metadata.labels = {
-    [`${LABEL_NAMESPACE}/objectId`]: payload.id,
-    [`${LABEL_NAMESPACE}/userId`]: payload.user_created,
-  }
+  if (userId && payload.namespace)
+    metadata.namespace = getNamespace(userId, payload.namespace)
+  const labels = {}
+  if (userId) labels[`${LABEL_NAMESPACE}/userId`] = userId
+  if (payload.id) labels[`${LABEL_NAMESPACE}/objectId`] = payload.id
+  if (payload.user_created)
+    labels[`${LABEL_NAMESPACE}/creatorId`] = payload.user_created
+  metadata.labels = labels
   return metadata
 }
 
@@ -150,6 +153,7 @@ export async function forwardToKubernetes(
   handlerFunction
 ) {
   const { key, keys, collection } = meta
+  const { schema, accountability } = context
   let ids
   if (key && !keys) {
     ids = [key]
@@ -161,13 +165,13 @@ export async function forwardToKubernetes(
     try {
       const { ItemsService } = services
       const service = new ItemsService(collection, {
-        schema: context.schema,
-        accountability: context.accountability,
+        schema,
+        accountability,
       })
       object = await service.readOne(id)
     } catch {}
     try {
-      _status = await handlerFunction(object || id)
+      _status = await handlerFunction(object || id, accountability.user)
       _errors = null
     } catch (err) {
       _status = null

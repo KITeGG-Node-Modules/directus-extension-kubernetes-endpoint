@@ -3,9 +3,9 @@ import { DateTime } from 'luxon'
 import { makeContainer } from './container.js'
 import { genericMetadata } from '../util.js'
 
-export function makeDeployment(payload) {
+export function makeDeployment(payload, userId) {
   const deployment = new k8s.V1Deployment()
-  deployment.metadata = genericMetadata(payload)
+  deployment.metadata = genericMetadata(payload, userId)
 
   const spec = new k8s.V1DeploymentSpec()
   spec.replicas = payload.replicas

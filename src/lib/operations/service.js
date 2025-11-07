@@ -3,26 +3,28 @@ import k8s from '@kubernetes/client-node'
 import { makeService } from '../factories/service.js'
 import { LABEL_NAMESPACE } from '../config.js'
 
-export async function createOrReplaceService(object, res = undefined) {
-  const payload = makeService(object)
+export async function createOrReplaceService(object, userId) {
+  const payload = makeService(object, userId)
   const client = getKubernetesClient(undefined, k8s.CoreV1Api)
   const { body: existing } = await client.listNamespacedService(
-    object.namespace,
+    payload.metadata.namespace,
     undefined,
     undefined,
     undefined,
-    `metadata.name=${object.name}`
+    `metadata.name=${payload.metadata.name}`
   )
   let result
   if (existing.items.length === 1) {
     result = await client.replaceNamespacedService(
-      object.name,
-      object.namespace,
+      payload.metadata.name,
+      payload.metadata.namespace,
       payload
     )
   } else {
-    result = await client.createNamespacedService(object.namespace, payload)
-    if (res) res.status(201)
+    result = await client.createNamespacedService(
+      payload.metadata.namespace,
+      payload
+    )
   }
   if (result.response) return result.response.body
 }

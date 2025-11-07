@@ -3,26 +3,28 @@ import k8s from '@kubernetes/client-node'
 import { makeConfigMap } from '../factories/config-map.js'
 import { LABEL_NAMESPACE } from '../config.js'
 
-export async function createOrReplaceConfigMap(object, res = undefined) {
-  const payload = makeConfigMap(object)
+export async function createOrReplaceConfigMap(object, userId) {
+  const payload = makeConfigMap(object, userId)
   const client = getKubernetesClient(undefined, k8s.CoreV1Api)
   const { body: existing } = await client.listNamespacedConfigMap(
-    object.namespace,
+    payload.metadata.namespace,
     undefined,
     undefined,
     undefined,
-    `metadata.name=${object.name}`
+    `metadata.name=${payload.metadata.name}`
   )
   let result
   if (existing.items.length === 1) {
     result = await client.replaceNamespacedConfigMap(
-      object.name,
-      object.namespace,
+      payload.metadata.name,
+      payload.metadata.namespace,
       payload
     )
   } else {
-    result = await client.createNamespacedConfigMap(object.namespace, payload)
-    if (res) res.status(201)
+    result = await client.createNamespacedConfigMap(
+      payload.metadata.namespace,
+      payload
+    )
   }
   if (result.response) return result.response.body
 }
