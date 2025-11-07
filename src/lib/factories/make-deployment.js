@@ -1,17 +1,11 @@
 import k8s from '@kubernetes/client-node'
 import { DateTime } from 'luxon'
 import { makeContainer } from './make-container.js'
+import { genericMetadata } from '../util.js'
 
 export function makeDeployment(payload) {
   const deployment = new k8s.V1Deployment()
-
-  const metadata = new k8s.V1ObjectMeta()
-  metadata.name = payload.name
-  metadata.namespace = payload.namespace
-  metadata.labels = {
-    'llp.kitegg.de/objectId': payload.id,
-  }
-  deployment.metadata = metadata
+  deployment.metadata = genericMetadata(payload)
 
   const spec = new k8s.V1DeploymentSpec()
   spec.replicas = payload.replicas

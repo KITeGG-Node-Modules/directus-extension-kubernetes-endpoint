@@ -3,28 +3,25 @@ import { servicesNamespace } from '../config.js'
 import { DateTime } from 'luxon'
 import { makeVolumeClaim } from './make-volume-claim.js'
 import { makeContainer } from './make-container.js'
-import { isSuffixedVolumeName } from '../util.js'
+import { genericMetadata, isSuffixedVolumeName } from '../util.js'
 
-export function makeStatefulSet(name, deployment) {
+export function makeStatefulSet(payload) {
   const servicePayloads = []
 
-  const metadata = new k8s.V1ObjectMeta()
-  metadata.name = name
-  metadata.namespace = servicesNamespace
   const statefulSet = new k8s.V1StatefulSet()
-  statefulSet.metadata = metadata
+  statefulSet.metadata = genericMetadata(payload)
   const spec = new k8s.V1StatefulSetSpec()
-  spec.replicas = deployment.replicas || 1
-  spec.serviceName = name
+  spec.replicas = payload.replicas || 1
+  spec.serviceName = payload.name
   const selector = new k8s.V1LabelSelector()
   selector.matchLabels = {
-    app: name,
+    app: payload.name,
   }
   spec.selector = selector
   const podTemplateSpec = new k8s.V1PodTemplateSpec()
   podTemplateSpec.metadata = new k8s.V1ObjectMeta()
   podTemplateSpec.metadata.labels = {
-    app: name,
+    app: payload.name,
   }
   podTemplateSpec.metadata.annotations = {
     'llp.kitegg.de/restartedAt': DateTime.now().toISO(),
@@ -33,7 +30,7 @@ export function makeStatefulSet(name, deployment) {
   podSpec.nodeSelector = {
     'node-role.kubernetes.io/worker': 'worker',
   }
-  podSpec.restartPolicy = deployment.restartPolicy || 'Always'
+  podSpec.restartPolicy = payload.restartPolicy || 'Always'
   podSpec.enableServiceLinks = false
 
   function parseContainers(containers) {
@@ -49,16 +46,16 @@ export function makeStatefulSet(name, deployment) {
       if (c.changeGroupOnMismatch) {
         podSpec.securityContext.fsGroupChangePolicy = 'OnRootMismatch'
       }
-      return makeContainer(c, servicePayloads, name)
+      return makeContainer(c, servicePayloads, payload.name)
     })
   }
 
-  podSpec.containers = parseContainers(deployment.containers)
-  if (deployment.initContainers) {
-    podSpec.initContainers = parseContainers(deployment.initContainers)
+  podSpec.containers = parseContainers(payload.containers)
+  if (payload.initContainers) {
+    podSpec.initContainers = parseContainers(payload.initContainers)
   }
 
-  podSpec.volumes = (deployment.volumes || [])
+  podSpec.volumes = (payload.volumes || [])
     .map((v) => {
       if (isSuffixedVolumeName(v.name)) {
         const volume = new k8s.V1Volume()
@@ -76,7 +73,7 @@ export function makeStatefulSet(name, deployment) {
   podTemplateSpec.spec = podSpec
   spec.template = podTemplateSpec
 
-  spec.volumeClaimTemplates = (deployment.volumes || [])
+  spec.volumeClaimTemplates = (payload.volumes || [])
     .map((v) => {
       if (isSuffixedVolumeName(v.name)) {
         return null
