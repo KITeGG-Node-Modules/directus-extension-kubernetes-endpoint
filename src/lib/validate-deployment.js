@@ -81,7 +81,7 @@ export function validateDeployment(deployment, userGroups = []) {
             numericality: {
               strict: true,
               noStrings: true,
-              lessThanOrEqualTo: 128,
+              lessThanOrEqualTo: 256,
             },
           },
         })
