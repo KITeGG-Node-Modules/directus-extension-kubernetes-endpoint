@@ -8,21 +8,10 @@ import { ROUTE_PREFIX } from '../../lib/config.js'
 
 export function deleteNamespace(router, context) {
   router.delete(
-    `${ROUTE_PREFIX}/namespaces/:id`,
+    `${ROUTE_PREFIX}/namespaces/:namespace`,
     baseRequestHandler(async (ctx) => {
-      const { req, res, user, services } = ctx
-      const { ItemsService } = services
-      const namespacesService = new ItemsService('k8s_namespaces', {
-        schema: req.schema,
-        accountability: req.accountability,
-      })
-      const namespaceObject = await namespacesService.readOne(req.params.id)
-      if (!namespaceObject) {
-        res.status(404)
-        return { message: 'api_errors.not_found' }
-      }
-
-      const namespaceName = getNamespace(user, namespaceObject.name)
+      const { req, res, user } = ctx
+      const namespaceName = getNamespace(user.id, req.params.namespace)
       try {
         const client = getKubernetesClient(undefined, k8s.CoreV1Api)
         await client.deleteNamespace(namespaceName)
@@ -30,7 +19,7 @@ export function deleteNamespace(router, context) {
         return handleErrorResponse(res, err)
       }
 
-      return { deleted: namespaceObject.id }
+      return { deleted: req.params.namespace }
     }, context)
   )
 }
