@@ -69,10 +69,11 @@ export async function updateStatus(
       schema: context.schema,
       accountability: context.accountability,
     })
-    await deploymentsService.updateOne(key, {
-      _status: JSON.stringify(_status),
-      _errors: JSON.stringify(_errors),
-    })
+    const payload = {
+      _status: _status ? JSON.stringify(_status) : null,
+      _errors: _errors ? JSON.stringify(_errors) : null,
+    }
+    await deploymentsService.updateOne(key, payload)
   } catch (err) {
     console.error('Failed to update status for', collection, key, err.message)
   }
