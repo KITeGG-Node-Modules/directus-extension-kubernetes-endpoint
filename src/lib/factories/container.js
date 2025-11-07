@@ -37,7 +37,7 @@ export function makeContainer(c) {
     })
   }
 
-  container.env = (c.environment || []).map((e) => {
+  container.env = (c.env || []).map((e) => {
     const envVar = new k8s.V1EnvVar()
     envVar.name = e.name
     if (e.valueFromSecret) {
