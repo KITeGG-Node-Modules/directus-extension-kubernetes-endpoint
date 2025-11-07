@@ -7,7 +7,6 @@ import {
   UUID_LENGTH,
 } from './config.js'
 import { createError } from '@directus/errors'
-import { validateContainer } from './validations/container.js'
 
 export function getNameSlug(name) {
   return slugify(name, {
