@@ -23,6 +23,7 @@ import {
 import { validateContainer } from '../lib/validations/container.js'
 import { validateService } from '../lib/validations/service.js'
 import { validateVolume } from '../lib/validations/volume.js'
+import { validateSecret } from '../lib/validations/secret.js'
 
 export default (...args) => {
   //
@@ -68,7 +69,7 @@ export default (...args) => {
   // VolumeClaims
 
   const VOLUME_K8S_PROPS = ['size', 'mountType']
-  genericFilter(args, 'k8s_services.items', VOLUME_K8S_PROPS, validateVolume)
+  genericFilter(args, 'k8s_volumes.items', VOLUME_K8S_PROPS, validateVolume)
   genericAction(
     args,
     'k8s_volumes.items',
@@ -80,10 +81,12 @@ export default (...args) => {
   //
   // Secrets
 
+  const SECRET_K8S_PROPS = ['data']
+  genericFilter(args, 'k8s_secrets.items', SECRET_K8S_PROPS, validateSecret)
   genericAction(
     args,
     'k8s_secrets.items',
-    ['data'],
+    SECRET_K8S_PROPS,
     createOrReplaceSecret,
     removeSecret
   )
@@ -91,10 +94,12 @@ export default (...args) => {
   //
   // ConfigMaps
 
+  const CONFIG_MAP_K8S_PROPS = ['data']
+  genericFilter(args, 'k8s_configs.items', CONFIG_MAP_K8S_PROPS, validateSecret)
   genericAction(
     args,
     'k8s_configs.items',
-    ['data'],
+    CONFIG_MAP_K8S_PROPS,
     createOrReplaceConfigMap,
     removeConfigMap
   )

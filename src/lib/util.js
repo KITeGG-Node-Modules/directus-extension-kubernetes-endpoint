@@ -79,7 +79,7 @@ export function needsDeploy(payload, k8sProps) {
 
 export function genericValidation(payload, validateFunc) {
   const result = validateFunc(payload)
-  if (result.length > 0) {
+  if (result && result.length > 0) {
     const errors = result
       .reduce((acc, curr) => {
         acc.push(

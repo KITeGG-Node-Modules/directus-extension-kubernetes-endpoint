@@ -3,7 +3,6 @@ import validate from 'validate.js'
 export function validateService(service) {
   const validationErrors = validate(service, {
     name: {
-      presence: true,
       type: 'string',
       format: {
         pattern:
@@ -12,7 +11,6 @@ export function validateService(service) {
       },
     },
     namespace: {
-      presence: true,
       type: 'string',
       format: {
         pattern:
@@ -21,7 +19,6 @@ export function validateService(service) {
       },
     },
     port: {
-      presence: true,
       type: 'integer',
       numericality: {
         strict: true,
