@@ -10,9 +10,6 @@ export function validateSecret(payload) {
         message: 'must be a lowercase RFC1123 hostname (a-z,0-9,-,.)',
       },
     },
-    data: {
-      type: 'string',
-    },
   })
   if (validationErrors?.length) return validationErrors
 }

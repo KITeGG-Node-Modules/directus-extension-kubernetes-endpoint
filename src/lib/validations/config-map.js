@@ -10,8 +10,13 @@ export function validateConfigMap(payload) {
         message: 'must be a lowercase RFC1123 hostname (a-z,0-9,-,.)',
       },
     },
-    data: {
+    namespace: {
       type: 'string',
+      format: {
+        pattern:
+          '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*',
+        message: 'must be a lowercase RFC1123 hostname (a-z,0-9,-,.)',
+      },
     },
   })
   if (validationErrors?.length) return validationErrors

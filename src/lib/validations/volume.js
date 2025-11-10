@@ -10,6 +10,14 @@ export function validateVolume(payload) {
         message: 'must be a lowercase RFC1123 hostname (a-z,0-9,-,.)',
       },
     },
+    namespace: {
+      type: 'string',
+      format: {
+        pattern:
+          '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*',
+        message: 'must be a lowercase RFC1123 hostname (a-z,0-9,-,.)',
+      },
+    },
     size: {
       type: 'string',
       format: {
