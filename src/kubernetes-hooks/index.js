@@ -21,13 +21,18 @@ import {
   removeConfigMap,
 } from '../lib/operations/config-map.js'
 import { validateContainer } from '../lib/validations/container.js'
+import { validateService } from '../lib/validations/service.js'
 
 export default (...args) => {
   //
   // Deployments
 
-  genericFilter(args, 'k8s_deployments.items', (payload) => {
-    if (payload.containers) {
+  const DEPLOYMENT_K8S_PROPS = ['containers']
+  genericFilter(
+    args,
+    'k8s_deployments.items',
+    DEPLOYMENT_K8S_PROPS,
+    (payload) => {
       let containerErrors = []
       for (const container of payload.containers) {
         containerErrors = containerErrors.concat(
@@ -36,11 +41,11 @@ export default (...args) => {
       }
       return containerErrors
     }
-  })
+  )
   genericAction(
     args,
     'k8s_deployments.items',
-    ['containers', 'podName'],
+    DEPLOYMENT_K8S_PROPS,
     createOrReplaceDeployment,
     removeDeployment
   )
@@ -48,10 +53,12 @@ export default (...args) => {
   //
   // Services
 
+  const SERVICE_K8S_PROPS = ['ports', 'port', 'protocol']
+  genericFilter(args, 'k8s_services.items', SERVICE_K8S_PROPS, validateService)
   genericAction(
     args,
     'k8s_services.items',
-    ['ports'],
+    SERVICE_K8S_PROPS,
     createOrReplaceService,
     removeService
   )

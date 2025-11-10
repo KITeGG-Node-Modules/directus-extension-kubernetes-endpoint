@@ -70,6 +70,13 @@ export function genericMetadata(payload, userId) {
   return metadata
 }
 
+export function needsDeploy(payload, k8sProps) {
+  return Object.keys(payload).reduce(
+    (result, key) => result || k8sProps.includes(key),
+    false
+  )
+}
+
 export function genericValidation(payload, validateFunc) {
   const result = validateFunc(payload)
   if (result.length > 0) {
@@ -93,15 +100,12 @@ export function genericAction(args, key, k8sProps, createFunc, removeFunc) {
   const [{ action }, { services }] = args
 
   action(`${key}.create`, async (meta, context) => {
-    await forwardToKubernetes(services, meta, context, createFunc)
+    if (needsDeploy(meta.payload, k8sProps))
+      await forwardToKubernetes(services, meta, context, createFunc)
   })
 
   action(`${key}.update`, async (meta, context) => {
-    const needsDeploy = Object.keys(meta.payload).reduce(
-      (result, key) => result || k8sProps.includes(key),
-      false
-    )
-    if (needsDeploy)
+    if (needsDeploy(meta.payload, k8sProps))
       await forwardToKubernetes(services, meta, context, createFunc)
   })
 
@@ -110,15 +114,15 @@ export function genericAction(args, key, k8sProps, createFunc, removeFunc) {
   })
 }
 
-export function genericFilter(args, key, validateFunc) {
+export function genericFilter(args, key, k8sProps, validateFunc) {
   const [{ filter }] = args
 
   filter(`${key}.create`, async (payload) => {
-    genericValidation(payload, validateFunc)
+    if (needsDeploy(payload, k8sProps)) genericValidation(payload, validateFunc)
   })
 
   filter(`${key}.update`, async (payload) => {
-    genericValidation(payload, validateFunc)
+    if (needsDeploy(payload, k8sProps)) genericValidation(payload, validateFunc)
   })
 }
 
@@ -136,6 +140,7 @@ export async function updateStatus(
       schema: context.schema,
       accountability: context.accountability,
     })
+    // TODO: Mask the full namespace in _status and _errors
     const payload = {
       _status: _status ? JSON.stringify(_status) : null,
       _errors: _errors ? JSON.stringify(_errors) : null,
