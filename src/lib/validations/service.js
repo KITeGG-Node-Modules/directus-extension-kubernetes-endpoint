@@ -1,0 +1,39 @@
+import validate from 'validate.js'
+
+export function validateService(service) {
+  const validationErrors = validate(service, {
+    name: {
+      presence: true,
+      type: 'string',
+      format: {
+        pattern:
+          '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*',
+        message: 'must be a lowercase RFC1123 hostname (a-z,0-9,-,.)',
+      },
+    },
+    namespace: {
+      presence: true,
+      type: 'string',
+      format: {
+        pattern:
+          '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*',
+        message: 'must be a lowercase RFC1123 hostname (a-z,0-9,-,.)',
+      },
+    },
+    port: {
+      presence: true,
+      type: 'integer',
+      numericality: {
+        strict: true,
+        noStrings: true,
+        onlyInteger: true,
+        greaterThan: 0,
+      },
+    },
+    protocol: {
+      type: 'string',
+      inclusion: ['TCP', 'UDP'],
+    },
+  })
+  if (validationErrors?.length) return validationErrors
+}
