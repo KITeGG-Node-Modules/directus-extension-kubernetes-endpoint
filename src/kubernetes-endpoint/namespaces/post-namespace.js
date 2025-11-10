@@ -34,10 +34,7 @@ export function postNamespace(router, context) {
         return handleErrorResponse(res, err)
       }
 
-      return {
-        name: parseNamespace(namespaceObject.name).name,
-        user: parseNamespace(namespaceObject.name).user,
-      }
+      return parseNamespace(namespaceObject.name)
     }, context)
   )
 }
