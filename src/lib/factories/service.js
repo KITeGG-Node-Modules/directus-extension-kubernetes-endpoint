@@ -8,7 +8,14 @@ export function makeService(payload, userId) {
   service.spec.selector = {
     app: payload.name,
   }
-  service.spec.ports = (payload.ports || []).map((p) => {
+  const ports = [
+    {
+      name: payload.name,
+      port: parseInt(payload.port),
+      protocol: payload.protocol,
+    },
+  ]
+  service.spec.ports = (ports || []).map((p) => {
     const servicePort = new k8s.V1ServicePort()
     servicePort.name = p.name
     servicePort.port = p.port
