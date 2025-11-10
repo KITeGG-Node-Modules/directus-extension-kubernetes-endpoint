@@ -1,7 +1,7 @@
 import { getKubernetesClient } from 'kitegg-directus-extension-common'
 import k8s from '@kubernetes/client-node'
 import { makeConfigMap } from '../factories/config-map.js'
-import { LABEL_NAMESPACE } from '../config.js'
+import { LABEL_NAMESPACE } from '../variables.js'
 
 export async function createOrReplaceConfigMap(object, userId) {
   const payload = makeConfigMap(object, userId)

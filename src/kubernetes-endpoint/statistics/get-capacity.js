@@ -2,7 +2,7 @@ import {
   baseRequestHandler,
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
-import { ROUTE_PREFIX } from '../../lib/config.js'
+import { ROUTE_PREFIX } from '../../lib/variables.js'
 
 export function mapResourceNames(resourceName) {
   switch (resourceName) {

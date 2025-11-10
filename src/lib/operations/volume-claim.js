@@ -1,7 +1,7 @@
 import { getKubernetesClient } from 'kitegg-directus-extension-common'
 import k8s from '@kubernetes/client-node'
 import { makeVolumeClaim } from '../factories/volume-claim.js'
-import { LABEL_NAMESPACE } from '../config.js'
+import { LABEL_NAMESPACE } from '../variables.js'
 
 export async function createOrReplaceVolumeClaim(object, userId) {
   const payload = makeVolumeClaim(object, userId)

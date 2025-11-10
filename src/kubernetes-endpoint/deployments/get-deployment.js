@@ -4,7 +4,7 @@ import {
 } from 'kitegg-directus-extension-common'
 import { handleErrorResponse } from '../../lib/util.js'
 import k8s from '@kubernetes/client-node'
-import { ROUTE_PREFIX } from '../../lib/config.js'
+import { ROUTE_PREFIX } from '../../lib/variables.js'
 
 export function getDeployment(router, context) {
   router.get(

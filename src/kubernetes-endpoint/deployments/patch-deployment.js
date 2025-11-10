@@ -2,15 +2,15 @@ import {
   baseRequestHandler,
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
-import { getDeploymentName, handleErrorResponse } from '../../lib/util.js'
-import { ROUTE_PREFIX, servicesNamespace } from '../../lib/config.js'
+import { handleErrorResponse } from '../../lib/util.js'
+import { ROUTE_PREFIX } from '../../lib/variables.js'
 import k8s from '@kubernetes/client-node'
 
 export function patchDeployment(router, context) {
   router.patch(
     `${ROUTE_PREFIX}/deployments/:id`,
     baseRequestHandler(async (ctx) => {
-      const { req, res, services, user } = ctx
+      const { req, res, services } = ctx
       const { scale } = req.query
       const { ItemsService } = services
       const deploymentsService = new ItemsService('k8s_deployments', {

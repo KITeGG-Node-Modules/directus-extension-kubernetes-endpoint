@@ -10,7 +10,7 @@ import {
 import k8s from '@kubernetes/client-node'
 import { validateNamespace } from '../../lib/validations/namespace.js'
 import { makeNamespace } from '../../lib/factories/namespace.js'
-import { ROUTE_PREFIX } from '../../lib/config.js'
+import { ROUTE_PREFIX } from '../../lib/variables.js'
 
 export function postNamespace(router, context) {
   router.post(

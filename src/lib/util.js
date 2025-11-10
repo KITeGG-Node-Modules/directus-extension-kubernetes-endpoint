@@ -5,7 +5,7 @@ import {
   NAMESPACE_PREFIX,
   NAMESPACE_PREFIX_FULL_LENGTH,
   UUID_LENGTH,
-} from './config.js'
+} from './variables.js'
 import { createError } from '@directus/errors'
 
 export function getNameSlug(name) {

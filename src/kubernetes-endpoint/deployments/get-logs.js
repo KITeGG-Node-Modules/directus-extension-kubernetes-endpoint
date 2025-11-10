@@ -2,7 +2,7 @@ import {
   baseRequestHandler,
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
-import { ROUTE_PREFIX, servicesNamespace } from '../../lib/config.js'
+import { ROUTE_PREFIX, servicesNamespace } from '../../lib/variables.js'
 import { handleErrorResponse } from '../../lib/util.js'
 
 export function getLogs(router, context) {

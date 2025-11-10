@@ -1,7 +1,7 @@
 import { getKubernetesClient } from 'kitegg-directus-extension-common'
 import k8s from '@kubernetes/client-node'
 import { makeSecret } from '../factories/secret.js'
-import { LABEL_NAMESPACE } from '../config.js'
+import { LABEL_NAMESPACE } from '../variables.js'
 
 export async function createOrReplaceSecret(object, userId) {
   const payload = makeSecret(object, userId)

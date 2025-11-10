@@ -3,7 +3,7 @@ import {
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
 import { getDeploymentName, handleErrorResponse } from '../../lib/util.js'
-import { ROUTE_PREFIX, servicesNamespace } from '../../lib/config.js'
+import { ROUTE_PREFIX, servicesNamespace } from '../../lib/variables.js'
 import k8s from '@kubernetes/client-node'
 import { DateTime } from 'luxon'
 

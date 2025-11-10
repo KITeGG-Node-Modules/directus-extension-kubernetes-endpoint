@@ -8,7 +8,7 @@ import {
   parseNamespace,
 } from '../../lib/util.js'
 import k8s from '@kubernetes/client-node'
-import { ROUTE_PREFIX } from '../../lib/config.js'
+import { ROUTE_PREFIX } from '../../lib/variables.js'
 
 export function listNamespaces(router, context) {
   router.get(

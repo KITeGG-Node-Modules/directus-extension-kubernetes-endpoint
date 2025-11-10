@@ -1,7 +1,7 @@
 import k8s from '@kubernetes/client-node'
 import { genericMetadata } from '../util.js'
 import { getKubernetesClient } from 'kitegg-directus-extension-common'
-import { LABEL_NAMESPACE } from '../config.js'
+import { LABEL_NAMESPACE } from '../variables.js'
 
 export function makeVolumeClaim(payload, userId) {
   const volumeClaim = new k8s.V1PersistentVolumeClaim()
@@ -16,7 +16,7 @@ export function makeVolumeClaim(payload, userId) {
   return volumeClaim
 }
 
-export async function removeVolumeClaim(id, res = undefined) {
+export async function removeVolumeClaim(id) {
   const client = getKubernetesClient(undefined, k8s.CoreV1Api)
   const { body: existing } =
     await client.listPersistentVolumeClaimForAllNamespaces(
