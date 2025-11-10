@@ -2,7 +2,11 @@ import {
   baseRequestHandler,
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
-import { getNamespace, handleErrorResponse } from '../../lib/util.js'
+import {
+  getNamespace,
+  handleErrorResponse,
+  parseNamespace,
+} from '../../lib/util.js'
 import k8s from '@kubernetes/client-node'
 import { validateNamespace } from '../../lib/validations/namespace.js'
 import { makeNamespace } from '../../lib/factories/namespace.js'
@@ -30,7 +34,10 @@ export function postNamespace(router, context) {
         return handleErrorResponse(res, err)
       }
 
-      return namespaceObject
+      return {
+        name: parseNamespace(namespaceObject.name).name,
+        user: parseNamespace(namespaceObject.name).user,
+      }
     }, context)
   )
 }
