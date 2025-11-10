@@ -22,6 +22,7 @@ import {
 } from '../lib/operations/config-map.js'
 import { validateContainer } from '../lib/validations/container.js'
 import { validateService } from '../lib/validations/service.js'
+import { validateVolume } from '../lib/validations/volume.js'
 
 export default (...args) => {
   //
@@ -66,10 +67,12 @@ export default (...args) => {
   //
   // VolumeClaims
 
+  const VOLUME_K8S_PROPS = ['size', 'mountType']
+  genericFilter(args, 'k8s_services.items', VOLUME_K8S_PROPS, validateVolume)
   genericAction(
     args,
     'k8s_volumes.items',
-    ['size', 'mountType'],
+    VOLUME_K8S_PROPS,
     createOrReplaceVolumeClaim,
     removeVolumeClaim
   )
