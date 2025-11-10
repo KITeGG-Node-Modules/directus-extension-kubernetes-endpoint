@@ -27,10 +27,10 @@ export function getDeployment(router, context) {
           deploymentObject.namespace
         )
         const appsClient = getKubernetesClient(
-          deploymentObject.namespace,
+          deploymentNamespace,
           k8s.AppsV1Api
         )
-        const coreClient = getKubernetesClient(deploymentObject.namespace)
+        const coreClient = getKubernetesClient(deploymentNamespace)
         const { body: deployment } = await appsClient.readNamespacedDeployment(
           deploymentObject.name,
           deploymentNamespace

@@ -2,11 +2,7 @@ import {
   baseRequestHandler,
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
-import {
-  getDeploymentName,
-  getNamespace,
-  handleErrorResponse,
-} from '../../lib/util.js'
+import { getNamespace, handleErrorResponse } from '../../lib/util.js'
 import { ROUTE_PREFIX } from '../../lib/variables.js'
 import k8s from '@kubernetes/client-node'
 import { DateTime } from 'luxon'
@@ -15,9 +11,9 @@ export function restartDeployment(router, context) {
   router.get(
     `${ROUTE_PREFIX}/deployments/:id/hooks/restart`,
     baseRequestHandler(async (ctx) => {
-      const { req, res, user, services } = ctx
+      const { req, res, services } = ctx
       const { ItemsService } = services
-      const deploymentsService = new ItemsService('deployments', {
+      const deploymentsService = new ItemsService('k8s_deployments', {
         schema: req.schema,
         accountability: req.accountability,
       })
@@ -31,14 +27,13 @@ export function restartDeployment(router, context) {
           deployment.user_created,
           deployment.namespace
         )
-        const statefulSetName = getDeploymentName(user, deployment.id)
         const client = getKubernetesClient(deploymentNamespace, k8s.AppsV1Api)
-        const { body: existing } = await client.listNamespacedStatefulSet(
+        const { body: existing } = await client.listNamespacedDeployment(
           deploymentNamespace,
           undefined,
           undefined,
           undefined,
-          `metadata.name=${statefulSetName}`
+          `metadata.name=${deployment.name}`
         )
         if (existing.items.length === 1) {
           const patch = [
@@ -55,8 +50,8 @@ export function restartDeployment(router, context) {
               'Content-type': k8s.PatchUtils.PATCH_FORMAT_JSON_PATCH,
             },
           }
-          await client.patchNamespacedStatefulSet(
-            statefulSetName,
+          await client.patchNamespacedDeployment(
+            deployment.name,
             deploymentNamespace,
             patch,
             undefined,

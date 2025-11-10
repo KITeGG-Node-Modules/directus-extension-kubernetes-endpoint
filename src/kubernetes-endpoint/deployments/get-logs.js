@@ -16,7 +16,7 @@ export function getLogs(router, context) {
         return { message: 'api_errors.pod_name_missing' }
       }
       const { ItemsService } = services
-      const deploymentsService = new ItemsService('deployments', {
+      const deploymentsService = new ItemsService('k8s_deployments', {
         schema: req.schema,
         accountability: req.accountability,
       })
