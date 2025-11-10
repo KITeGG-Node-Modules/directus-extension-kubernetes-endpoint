@@ -2,7 +2,7 @@ import {
   baseRequestHandler,
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
-import { handleErrorResponse } from '../../lib/util.js'
+import { getNamespace, handleErrorResponse } from '../../lib/util.js'
 import { ROUTE_PREFIX } from '../../lib/variables.js'
 import k8s from '@kubernetes/client-node'
 
@@ -23,10 +23,14 @@ export function patchDeployment(router, context) {
         return { message: 'api_errors.not_found' }
       }
       try {
-        const client = getKubernetesClient(deployment.namespace, k8s.AppsV1Api)
+        const deploymentNamespace = getNamespace(
+          deployment.user_created,
+          deployment.namespace
+        )
+        const client = getKubernetesClient(deploymentNamespace, k8s.AppsV1Api)
         if (typeof scale !== 'undefined') {
           const { body: existing } = await client.listNamespacedDeployment(
-            deployment.namespace,
+            deploymentNamespace,
             undefined,
             undefined,
             undefined,
@@ -49,7 +53,7 @@ export function patchDeployment(router, context) {
             }
             await client.patchNamespacedDeploymentScale(
               deployment.name,
-              deployment.namespace,
+              deploymentNamespace,
               patch,
               undefined,
               undefined,

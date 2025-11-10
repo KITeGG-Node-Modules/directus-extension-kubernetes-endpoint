@@ -2,7 +2,7 @@ import {
   baseRequestHandler,
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
-import { handleErrorResponse } from '../../lib/util.js'
+import { getNamespace, handleErrorResponse } from '../../lib/util.js'
 import k8s from '@kubernetes/client-node'
 import { ROUTE_PREFIX } from '../../lib/variables.js'
 
@@ -22,6 +22,10 @@ export function getDeployment(router, context) {
         return { message: 'api_errors.not_found' }
       }
       try {
+        const deploymentNamespace = getNamespace(
+          deploymentObject.user_created,
+          deploymentObject.namespace
+        )
         const appsClient = getKubernetesClient(
           deploymentObject.namespace,
           k8s.AppsV1Api
@@ -29,10 +33,10 @@ export function getDeployment(router, context) {
         const coreClient = getKubernetesClient(deploymentObject.namespace)
         const { body: deployment } = await appsClient.readNamespacedDeployment(
           deploymentObject.name,
-          deploymentObject.namespace
+          deploymentNamespace
         )
         const { body: podsBody } = await coreClient.listNamespacedPod(
-          deploymentObject.namespace,
+          deploymentNamespace,
           undefined,
           undefined,
           undefined,
@@ -42,7 +46,7 @@ export function getDeployment(router, context) {
         const { items: pods } = podsBody
         const { body: volumeClaimsBody } =
           await coreClient.listNamespacedPersistentVolumeClaim(
-            deploymentObject.namespace,
+            deploymentNamespace,
             undefined,
             undefined,
             undefined,

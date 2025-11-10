@@ -2,8 +2,8 @@ import {
   baseRequestHandler,
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
-import { handleErrorResponse } from '../../lib/util.js'
-import { ROUTE_PREFIX, servicesNamespace } from '../../lib/variables.js'
+import { getNamespace, handleErrorResponse } from '../../lib/util.js'
+import { ROUTE_PREFIX } from '../../lib/variables.js'
 import k8s from '@kubernetes/client-node'
 
 export function getEvents(router, context) {
@@ -27,14 +27,18 @@ export function getEvents(router, context) {
         return { message: 'api_errors.not_found' }
       }
       try {
+        const deploymentNamespace = getNamespace(
+          deployment.user_created,
+          deployment.namespace
+        )
         const eventsClient = getKubernetesClient(
-          servicesNamespace,
+          deploymentNamespace,
           k8s.EventsV1Api
         )
         // const labelSelector = `statefulset.kubernetes.io/pod-name=${podName}`
         const fieldSelector = `regarding.name=${podName}`
         const { body } = await eventsClient.listNamespacedEvent(
-          servicesNamespace,
+          deploymentNamespace,
           undefined,
           undefined,
           undefined,

@@ -2,8 +2,8 @@ import {
   baseRequestHandler,
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
-import { ROUTE_PREFIX, servicesNamespace } from '../../lib/variables.js'
-import { handleErrorResponse } from '../../lib/util.js'
+import { ROUTE_PREFIX } from '../../lib/variables.js'
+import { getNamespace, handleErrorResponse } from '../../lib/util.js'
 
 export function getLogs(router, context) {
   router.get(
@@ -26,13 +26,17 @@ export function getLogs(router, context) {
         return { message: 'api_errors.not_found' }
       }
       try {
-        const coreClient = getKubernetesClient(servicesNamespace)
+        const deploymentNamespace = getNamespace(
+          deployment.user_created,
+          deployment.namespace
+        )
+        const coreClient = getKubernetesClient(deploymentNamespace)
         const sinceSeconds = req.query.sinceSeconds
           ? parseInt(req.query.sinceSeconds)
           : undefined
         const { body } = await coreClient.readNamespacedPodLog(
           podName,
-          servicesNamespace,
+          deploymentNamespace,
           req.query.container,
           false,
           undefined,

@@ -2,8 +2,12 @@ import {
   baseRequestHandler,
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
-import { getDeploymentName, handleErrorResponse } from '../../lib/util.js'
-import { ROUTE_PREFIX, servicesNamespace } from '../../lib/variables.js'
+import {
+  getDeploymentName,
+  getNamespace,
+  handleErrorResponse,
+} from '../../lib/util.js'
+import { ROUTE_PREFIX } from '../../lib/variables.js'
 import k8s from '@kubernetes/client-node'
 import { DateTime } from 'luxon'
 
@@ -23,10 +27,14 @@ export function restartDeployment(router, context) {
         return { message: 'api_errors.not_found' }
       }
       try {
+        const deploymentNamespace = getNamespace(
+          deployment.user_created,
+          deployment.namespace
+        )
         const statefulSetName = getDeploymentName(user, deployment.id)
-        const client = getKubernetesClient(servicesNamespace, k8s.AppsV1Api)
+        const client = getKubernetesClient(deploymentNamespace, k8s.AppsV1Api)
         const { body: existing } = await client.listNamespacedStatefulSet(
-          servicesNamespace,
+          deploymentNamespace,
           undefined,
           undefined,
           undefined,
@@ -49,7 +57,7 @@ export function restartDeployment(router, context) {
           }
           await client.patchNamespacedStatefulSet(
             statefulSetName,
-            servicesNamespace,
+            deploymentNamespace,
             patch,
             undefined,
             undefined,
