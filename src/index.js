@@ -304,6 +304,11 @@ export default {
           return { message: 'api_errors.not_found' }
         }
         try {
+          const isValid = await checkReservation(req, services, deployment)
+          if (!isValid) {
+            res.status(400)
+            return { message: 'api_errors.not_enough_resources' }
+          }
           const coreClient = getKubernetesClient(servicesNamespace)
           await coreClient.deleteNamespacedPod(podName, servicesNamespace)
           return { deleted: podName }
