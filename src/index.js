@@ -20,6 +20,7 @@ import { makeSecret } from './lib/make-secret.js'
 import { createSecret } from './create-secret.js'
 import { makeConfigMap } from './lib/make-config-map.js'
 import { createConfigMap } from './create-config-map.js'
+import { checkReservation } from './lib/check-reservation.js'
 
 export default {
   id: 'kubernetes',
@@ -67,6 +68,11 @@ export default {
           return { message: 'api_errors.not_found' }
         }
         try {
+          const isValid = await checkReservation(req, services, deployment)
+          if (!isValid) {
+            res.status(400)
+            return { message: 'api_errors.not_enough_resources' }
+          }
           const statefulSetName = getDeploymentName(user, deployment.id)
           const client = getKubernetesClient(servicesNamespace, k8s.AppsV1Api)
           const { body: existing } = await client.listNamespacedStatefulSet(
@@ -200,6 +206,11 @@ export default {
           return { message: 'api_errors.not_found' }
         }
         try {
+          const isValid = await checkReservation(req, services, deployment)
+          if (!isValid) {
+            res.status(400)
+            return { message: 'api_errors.not_enough_resources' }
+          }
           const statefulSetName = getDeploymentName(user, deployment.id)
           const client = getKubernetesClient(servicesNamespace, k8s.AppsV1Api)
           if (typeof scale !== 'undefined') {
@@ -315,6 +326,11 @@ export default {
         if (!deployment) {
           res.status(404)
           return { message: 'api_errors.not_found' }
+        }
+        const isValid = await checkReservation(req, services, deployment)
+        if (!isValid) {
+          res.status(400)
+          return { message: 'api_errors.not_enough_resources' }
         }
         const statefulSetName = getDeploymentName(user, deployment.id)
         let deploymentData
