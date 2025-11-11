@@ -137,7 +137,7 @@ export function validateContainer(
   }
 
   if (Array.isArray(container.env)) {
-    for (const envVar of container.environment) {
+    for (const envVar of container.env) {
       const envVarErrors = validate(envVar, {
         name: {
           presence: true,
