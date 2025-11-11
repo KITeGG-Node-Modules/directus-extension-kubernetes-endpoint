@@ -1,5 +1,5 @@
 import k8s from '@kubernetes/client-node'
-import { genericMetadata, getNamespace } from '../util.js'
+import { genericMetadata } from '../util/k8s.js'
 
 export function makeNamespace(payload, userId) {
   const namespace = new k8s.V1Namespace()

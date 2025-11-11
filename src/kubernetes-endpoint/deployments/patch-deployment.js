@@ -2,7 +2,7 @@ import {
   baseRequestHandler,
   getKubernetesClient,
 } from 'kitegg-directus-extension-common'
-import { getNamespace, handleErrorResponse } from '../../lib/util.js'
+import { getNamespace, handleErrorResponse } from '../../lib/util/helpers.js'
 import { ROUTE_PREFIX } from '../../lib/variables.js'
 import k8s from '@kubernetes/client-node'
 

@@ -1,5 +1,5 @@
 import k8s from '@kubernetes/client-node'
-import { genericMetadata } from '../util.js'
+import { genericMetadata } from '../util/k8s.js'
 import { getKubernetesClient } from 'kitegg-directus-extension-common'
 import { LABEL_NAMESPACE } from '../variables.js'
 

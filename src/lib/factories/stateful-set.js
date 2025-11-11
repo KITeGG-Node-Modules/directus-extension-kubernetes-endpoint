@@ -2,7 +2,8 @@ import k8s from '@kubernetes/client-node'
 import { DateTime } from 'luxon'
 import { makeVolumeClaim } from './volume-claim.js'
 import { makeContainer } from './container.js'
-import { genericMetadata, isSuffixedVolumeName } from '../util.js'
+import { genericMetadata } from '../util/k8s.js'
+import { isSuffixedVolumeName } from '../util/helpers.js'
 
 export function makeStatefulSet(payload, userId) {
   const servicePayloads = []

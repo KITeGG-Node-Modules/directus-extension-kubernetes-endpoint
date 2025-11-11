@@ -1,4 +1,4 @@
-import { genericAction, genericFilter } from '../lib/util.js'
+import { genericAction, genericFilter } from '../lib/util/hooks.js'
 
 import {
   createOrReplaceDeployment,

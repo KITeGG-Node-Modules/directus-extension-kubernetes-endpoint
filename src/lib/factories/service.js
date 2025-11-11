@@ -1,5 +1,5 @@
 import k8s from '@kubernetes/client-node'
-import { genericMetadata } from '../util.js'
+import { genericMetadata } from '../util/k8s.js'
 
 export function makeService(payload, userId) {
   const service = new k8s.V1Service()

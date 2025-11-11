@@ -1,5 +1,5 @@
 import k8s from '@kubernetes/client-node'
-import { genericMetadata } from '../util.js'
+import { genericMetadata } from '../util/k8s.js'
 
 export function makeVolume(payload, userId) {
   const volume = new k8s.V1PersistentVolume()

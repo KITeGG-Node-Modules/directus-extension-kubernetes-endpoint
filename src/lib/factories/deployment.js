@@ -1,7 +1,7 @@
 import k8s from '@kubernetes/client-node'
 import { DateTime } from 'luxon'
 import { makeContainer } from './container.js'
-import { genericMetadata } from '../util.js'
+import { genericMetadata } from '../util/k8s.js'
 
 export function makeDeployment(payload, userId) {
   const deployment = new k8s.V1Deployment()

@@ -6,7 +6,7 @@ import {
   getNamespace,
   handleErrorResponse,
   parseNamespace,
-} from '../../lib/util.js'
+} from '../../lib/util/helpers.js'
 import k8s from '@kubernetes/client-node'
 import { validateNamespace } from '../../lib/validations/namespace.js'
 import { makeNamespace } from '../../lib/factories/namespace.js'

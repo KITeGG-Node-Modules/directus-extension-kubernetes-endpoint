@@ -1,0 +1,77 @@
+import { createError } from '@directus/errors'
+import { needsDeploy } from './helpers.js'
+import { forwardToKubernetes } from './k8s.js'
+
+export function genericValidation(payload, validateFunc) {
+  const result = validateFunc(payload)
+  if (result && result.length > 0) {
+    const errors = result
+      .reduce((acc, curr) => {
+        acc.push(
+          Object.keys(curr)
+            .map((key) => `${key}: ${curr[key]}`)
+            .join(', ')
+        )
+        return acc
+      }, [])
+      .join('; ')
+    const message = `Validation failed: ${errors}`
+    const CreateError = createError('BAD_REQUEST', message, 400)
+    throw new CreateError()
+  }
+}
+
+export function genericAction(args, key, k8sProps, createFunc, removeFunc) {
+  const [{ action }, { services }] = args
+
+  action(`${key}.create`, async (meta, context) => {
+    if (needsDeploy(meta.payload, k8sProps))
+      await forwardToKubernetes(services, meta, context, createFunc)
+  })
+
+  action(`${key}.update`, async (meta, context) => {
+    if (needsDeploy(meta.payload, k8sProps))
+      await forwardToKubernetes(services, meta, context, createFunc)
+  })
+
+  action(`${key}.delete`, async (meta, context) => {
+    await forwardToKubernetes(services, meta, context, removeFunc)
+  })
+}
+
+export function genericFilter(args, key, k8sProps, validateFunc) {
+  const [{ filter }] = args
+
+  filter(`${key}.create`, async (payload) => {
+    if (needsDeploy(payload, k8sProps)) genericValidation(payload, validateFunc)
+  })
+
+  filter(`${key}.update`, async (payload) => {
+    if (needsDeploy(payload, k8sProps)) genericValidation(payload, validateFunc)
+  })
+}
+
+export async function updateStatus(
+  services,
+  context,
+  collection,
+  key,
+  _status,
+  _errors
+) {
+  try {
+    const { ItemsService } = services
+    const deploymentsService = new ItemsService(collection, {
+      schema: context.schema,
+      accountability: context.accountability,
+    })
+    // TODO: Mask the full namespace in _status and _errors
+    const payload = {
+      _status: _status ? JSON.stringify(_status) : null,
+      _errors: _errors ? JSON.stringify(_errors) : null,
+    }
+    await deploymentsService.updateOne(key, payload)
+  } catch (err) {
+    console.error('Failed to update status for', collection, key, err.message)
+  }
+}
