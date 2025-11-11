@@ -1,12 +1,14 @@
 import slugify from 'slugify'
 import k8s from '@kubernetes/client-node'
 import {
+  GPU_PROFILE_MAPPING,
   LABEL_NAMESPACE,
   NAMESPACE_PREFIX,
   NAMESPACE_PREFIX_FULL_LENGTH,
   UUID_LENGTH,
 } from './variables.js'
 import { createError } from '@directus/errors'
+import { parse } from 'yaml'
 
 export function getNameSlug(name) {
   return slugify(name, {
@@ -183,5 +185,43 @@ export async function forwardToKubernetes(
       _errors = parseErrorResponse(err)
     }
     await updateStatus(services, context, collection, id, _status, _errors)
+  }
+}
+
+export async function checkReservation(req, services, deployment) {
+  const { ItemsService } = services
+  const reservationsService = new ItemsService('gpu_reservations', {
+    schema: req.schema,
+    accountability: req.accountability,
+  })
+  const data = parse(deployment.data)
+  const deploymentProfiles = (data.containers || []).reduce((p, c) => {
+    if (!c.gpu || !c.gpu.length) return p
+    if (!p[c.gpu]) p[c.gpu] = c.gpuCount || 1
+    else p[c.gpu] += c.gpuCount || 1
+    return p
+  }, {})
+  if (!Object.keys(deploymentProfiles).length) return true
+  const reservations = await reservationsService.readByQuery({
+    filter: { k8s_deployment: { _eq: deployment.id } },
+  })
+  const reservation = reservations.shift()
+  if (reservation) {
+    const profiles = reservation.gpus.reduce((p, c) => {
+      const pStr = GPU_PROFILE_MAPPING[c]
+      if (pStr) {
+        if (p[pStr]) p[pStr] += 1
+        else p[pStr] = 1
+      }
+      return p
+    }, {})
+    let isInvalid = false
+    for (const key in deploymentProfiles) {
+      isInvalid =
+        isInvalid || !profiles[key] || deploymentProfiles[key] > profiles[key]
+    }
+    return !isInvalid
+  } else {
+    return false
   }
 }
