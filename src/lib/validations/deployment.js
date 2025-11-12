@@ -1,16 +1,10 @@
 import validate from 'validate.js'
+import { GPU_PROFILES } from '../variables.js'
 
 export function validateDeployment(deployment, userGroups = []) {
   const isManagement = !!userGroups.find((group) => group.name === 'management')
-  const gpuProfiles = [
-    'nvidia.com/gpu',
-    'nvidia.com/mig-1g.10gb',
-    'nvidia.com/mig-2g.20gb',
-    'nvidia.com/mig-3g.40gb',
-  ]
   const gpuProps = {}
-  for (const profile of gpuProfiles) {
-    // TODO: These need to be mutually exclusive
+  for (const profile of GPU_PROFILES) {
     gpuProps[`containers.resources.requests.${profile}`] = {
       type: 'integer',
       numericality: {
