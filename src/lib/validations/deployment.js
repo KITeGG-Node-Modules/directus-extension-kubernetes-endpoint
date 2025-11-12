@@ -1,88 +1,191 @@
 import validate from 'validate.js'
-import { validateContainer } from './container.js'
 
 export function validateDeployment(deployment, userGroups = []) {
-  let validationErrors = []
-  const topLevelErrors = validate(deployment, {
-    containers: {
-      presence: true,
-      type: 'array',
-    },
-    initContainers: {
-      type: 'array',
-    },
-    replicas: {
+  const isManagement = !!userGroups.find((group) => group.name === 'management')
+  const gpuProfiles = [
+    'nvidia.com/gpu',
+    'nvidia.com/mig-1g.10gb',
+    'nvidia.com/mig-2g.20gb',
+    'nvidia.com/mig-3g.40gb',
+  ]
+  const gpuProps = {}
+  for (const profile of gpuProfiles) {
+    // TODO: These need to be mutually exclusive
+    gpuProps[`containers.resources.requests.${profile}`] = {
       type: 'integer',
       numericality: {
         strict: true,
         noStrings: true,
         onlyInteger: true,
-        lessThanOrEqualTo: 16,
+        lessThanOrEqualTo: isManagement ? 8 : 2,
+      },
+    }
+  }
+  const validationErrors = validate(deployment, {
+    name: {
+      type: 'string',
+      format: {
+        pattern:
+          '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*',
+        message:
+          'of container must be a lowercase RFC1123 hostname (a-z,0-9,-,.)',
       },
     },
-    restartPolicy: {
+    namespace: {
       type: 'string',
-      inclusion: ['Always', 'OnFailure', 'Never'],
+      format: {
+        pattern:
+          '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*',
+        message:
+          'of container must be a lowercase RFC1123 hostname (a-z,0-9,-,.)',
+      },
+    },
+
+    //
+    // Containers
+
+    containers: {
+      type: 'array',
+    },
+    'containers.image': {
+      type: 'string',
+    },
+    'containers.command': {
+      type: 'array',
+    },
+    'containers.args': {
+      type: 'array',
+    },
+
+    //
+    // Container Ports
+
+    'containers.ports': {
+      type: 'array',
+    },
+    'containers.ports.name': {
+      type: 'string',
+    },
+    'containers.ports.port': {
+      type: 'integer',
+      numericality: {
+        strict: true,
+        noStrings: true,
+        onlyInteger: true,
+        greaterThan: 0,
+      },
+    },
+
+    //
+    // Container Resources
+
+    'containers.resources.requests.cpu': {
+      type: 'integer',
+      numericality: {
+        strict: true,
+        noStrings: true,
+        onlyInteger: true,
+        greaterThanOrEqualTo: 1,
+        lessThanOrEqualTo: isManagement ? 256 : 32,
+      },
+    },
+    'containers.resources.requests.memory': {
+      type: 'number',
+      numericality: {
+        strict: true,
+        noStrings: true,
+        greaterThanOrEqualTo: 1,
+        lessThanOrEqualTo: isManagement ? 512 : 128,
+      },
+    },
+    ...gpuProps,
+
+    //
+    // Container Security
+
+    'containers.securityContext.runAsUser': {
+      type: 'integer',
+      numericality: {
+        strict: true,
+        noStrings: true,
+        onlyInteger: true,
+      },
+    },
+    'containers.securityContext.runAsGroup': {
+      type: 'integer',
+      numericality: {
+        strict: true,
+        noStrings: true,
+        onlyInteger: true,
+      },
+    },
+    'containers.securityContext.fsUser': {
+      type: 'integer',
+      numericality: {
+        strict: true,
+        noStrings: true,
+        onlyInteger: true,
+      },
+    },
+    'containers.securityContext.fsGroup': {
+      type: 'integer',
+      numericality: {
+        strict: true,
+        noStrings: true,
+        onlyInteger: true,
+      },
+    },
+    'containers.securityContext.fsGroupChangePolicy': {
+      type: 'string',
+      inclusion: ['Always', 'OnRootMismatch'],
+    },
+
+    //
+    // Container Env
+
+    'containers.env': {
+      type: 'array',
+    },
+    'containers.env.name': {
+      type: 'string',
+    },
+    'containers.env.value': {
+      type: 'string',
+    },
+    'containers.env.valueFromSecret.name': {
+      type: 'string',
+    },
+    'containers.env.valueFromConfig.key': {
+      type: 'string',
+    },
+
+    //
+    // Volumes
+
+    volumes: {
+      type: 'array',
+    },
+    'containers.volumeMounts': {
+      type: 'array',
+    },
+    'volumes.name': {
+      presence: true,
+      type: 'string',
+      format: {
+        pattern:
+          '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*',
+        message: 'of volume must be a lowercase RFC1123 hostname (a-z,0-9,-,.)',
+      },
+    },
+    'volumes.size': {
+      presence: true,
+      type: 'string',
+      format: {
+        pattern: '^\\d{1,3}(?:Mi|Gi){1}$',
+        message: 'must be one to three digits followed by Mi or Gi',
+      },
     },
   })
-  if (topLevelErrors) {
-    validationErrors = validationErrors.concat(topLevelErrors)
-    return validationErrors
-  }
-
-  if (Array.isArray(deployment.initContainers)) {
-    for (const container of deployment.initContainers) {
-      const containerErrors = validateContainer(container, [], userGroups)
-      if (containerErrors && containerErrors.length) {
-        validationErrors = validationErrors.concat(containerErrors)
-        return validationErrors
-      }
-    }
-  }
-
-  for (const container of deployment.containers) {
-    const containerErrors = validateContainer(container, [], userGroups)
-    if (containerErrors && containerErrors.length) {
-      validationErrors = validationErrors.concat(containerErrors)
-      return validationErrors
-    }
-  }
-
-  if (deployment.volumes) {
-    const volumesErrors = validate(deployment, {
-      volumes: {
-        presence: true,
-        type: 'array',
-      },
-    })
-    if (volumesErrors) validationErrors = validationErrors.concat(volumesErrors)
-    else {
-      for (const volume of deployment.volumes) {
-        const volumeErrors = validate(volume, {
-          name: {
-            presence: true,
-            type: 'string',
-            format: {
-              pattern:
-                '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*',
-              message:
-                'of volume must be a lowercase RFC1123 hostname (a-z,0-9,-,.)',
-            },
-          },
-          size: {
-            presence: true,
-            type: 'string',
-            format: {
-              pattern: '^\\d{1,3}(?:Mi|Gi){1}$',
-              message: 'must be one to three digits followed by Mi or Gi',
-            },
-          },
-        })
-        if (volumeErrors)
-          validationErrors = validationErrors.concat(volumeErrors)
-      }
-    }
-  }
 
   if (validationErrors.length) return validationErrors
 }

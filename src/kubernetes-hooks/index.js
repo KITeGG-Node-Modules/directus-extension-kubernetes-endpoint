@@ -20,10 +20,10 @@ import {
   createOrReplaceConfigMap,
   removeConfigMap,
 } from '../lib/operations/config-map.js'
-import { validateContainer } from '../lib/validations/container.js'
 import { validateService } from '../lib/validations/service.js'
 import { validateVolume } from '../lib/validations/volume.js'
 import { validateSecret } from '../lib/validations/secret.js'
+import { validateDeployment } from '../lib/validations/deployment.js'
 
 export default (...args) => {
   //
@@ -34,15 +34,7 @@ export default (...args) => {
     args,
     'k8s_deployments.items',
     DEPLOYMENT_K8S_PROPS,
-    (payload) => {
-      let containerErrors = []
-      for (const container of payload.containers) {
-        containerErrors = containerErrors.concat(
-          validateContainer(container) || []
-        )
-      }
-      return containerErrors
-    }
+    validateDeployment
   )
   genericAction(
     args,
