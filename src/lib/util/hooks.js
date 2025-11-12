@@ -1,6 +1,6 @@
 import { createError } from '@directus/errors'
 import { needsDeploy } from './helpers.js'
-import { forwardToKubernetes } from './k8s.js'
+import { checkForNamespaceChange, forwardToKubernetes } from './k8s.js'
 
 export function genericValidation(payload, validateFunc) {
   const result = validateFunc(payload)
@@ -39,15 +39,22 @@ export function genericAction(args, key, k8sProps, createFunc, removeFunc) {
   })
 }
 
-export function genericFilter(args, key, k8sProps, validateFunc) {
-  const [{ filter }] = args
+export function genericFilter(args, key, k8sKey, k8sProps, validateFunc) {
+  const [{ filter }, { services }] = args
 
   filter(`${key}.create`, async (payload) => {
     if (needsDeploy(payload, k8sProps)) genericValidation(payload, validateFunc)
   })
 
-  filter(`${key}.update`, async (payload) => {
-    if (needsDeploy(payload, k8sProps)) genericValidation(payload, validateFunc)
+  filter(`${key}.update`, async (payload, meta, context) => {
+    if (needsDeploy(payload, k8sProps)) {
+      genericValidation(payload, validateFunc)
+      await checkForNamespaceChange(
+        { payload, meta, context, services },
+        key.split('.').shift(),
+        k8sKey
+      )
+    }
   })
 }
 

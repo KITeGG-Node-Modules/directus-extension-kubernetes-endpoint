@@ -29,10 +29,11 @@ export default (...args) => {
   //
   // Deployments
 
-  const DEPLOYMENT_K8S_PROPS = ['containers']
+  const DEPLOYMENT_K8S_PROPS = ['name', 'namespace', 'containers']
   genericFilter(
     args,
     'k8s_deployments.items',
+    'Deployment',
     DEPLOYMENT_K8S_PROPS,
     validateDeployment
   )
@@ -47,8 +48,14 @@ export default (...args) => {
   //
   // Services
 
-  const SERVICE_K8S_PROPS = ['ports', 'port', 'protocol']
-  genericFilter(args, 'k8s_services.items', SERVICE_K8S_PROPS, validateService)
+  const SERVICE_K8S_PROPS = ['name', 'namespace', 'ports', 'port', 'protocol']
+  genericFilter(
+    args,
+    'k8s_services.items',
+    'Service',
+    SERVICE_K8S_PROPS,
+    validateService
+  )
   genericAction(
     args,
     'k8s_services.items',
@@ -60,8 +67,14 @@ export default (...args) => {
   //
   // VolumeClaims
 
-  const VOLUME_K8S_PROPS = ['size', 'mountType']
-  genericFilter(args, 'k8s_volumes.items', VOLUME_K8S_PROPS, validateVolume)
+  const VOLUME_K8S_PROPS = ['name', 'namespace', 'size', 'mountType']
+  genericFilter(
+    args,
+    'k8s_volumes.items',
+    'Volume',
+    VOLUME_K8S_PROPS,
+    validateVolume
+  )
   genericAction(
     args,
     'k8s_volumes.items',
@@ -73,8 +86,14 @@ export default (...args) => {
   //
   // Secrets
 
-  const SECRET_K8S_PROPS = ['data']
-  genericFilter(args, 'k8s_secrets.items', SECRET_K8S_PROPS, validateSecret)
+  const SECRET_K8S_PROPS = ['name', 'namespace', 'data']
+  genericFilter(
+    args,
+    'k8s_secrets.items',
+    'Secret',
+    SECRET_K8S_PROPS,
+    validateSecret
+  )
   genericAction(
     args,
     'k8s_secrets.items',
@@ -86,8 +105,14 @@ export default (...args) => {
   //
   // ConfigMaps
 
-  const CONFIG_MAP_K8S_PROPS = ['data']
-  genericFilter(args, 'k8s_configs.items', CONFIG_MAP_K8S_PROPS, validateSecret)
+  const CONFIG_MAP_K8S_PROPS = ['name', 'namespace', 'data']
+  genericFilter(
+    args,
+    'k8s_configs.items',
+    'ConfigMap',
+    CONFIG_MAP_K8S_PROPS,
+    validateSecret
+  )
   genericAction(
     args,
     'k8s_configs.items',
