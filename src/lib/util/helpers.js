@@ -1,5 +1,5 @@
 import { NAMESPACE_PREFIX, NAMESPACE_PREFIX_LENGTH } from '../variables.js'
-import slugify from '@sindresorhus/slugify'
+import slugify from 'slugify'
 
 export function getNamespace(namespace) {
   return `${NAMESPACE_PREFIX}${namespace}`
