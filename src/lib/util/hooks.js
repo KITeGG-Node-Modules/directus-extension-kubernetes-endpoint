@@ -1,5 +1,5 @@
 import { createError } from '@directus/errors'
-import { needsDeploy } from './helpers.js'
+import { getHostnameSlug, needsDeploy } from './helpers.js'
 import { checkForNamespaceChange, forwardToKubernetes } from './k8s.js'
 
 export async function genericValidation(payload, validateFunc) {
@@ -50,6 +50,9 @@ export function genericFilter(
   const [{ filter }, { services }] = args
 
   filter(`${key}.create`, async (payload) => {
+    if (payload.metaDisplayName) {
+      payload.name = getHostnameSlug(payload.metaDisplayName)
+    }
     if (needsDeploy(payload, k8sProps)) {
       try {
         await genericValidation(payload, validateFunc)
@@ -66,6 +69,9 @@ export function genericFilter(
   })
 
   filter(`${key}.update`, async (payload, meta, context) => {
+    if (payload.metaDisplayName) {
+      payload.name = getHostnameSlug(payload.metaDisplayName)
+    }
     if (needsDeploy(payload, k8sProps)) {
       if (blockUpdate) {
         const CreateError = createError(
