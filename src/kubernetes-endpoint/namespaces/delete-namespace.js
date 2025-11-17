@@ -11,7 +11,7 @@ export function deleteNamespace(router, context) {
     `${ROUTE_PREFIX}/namespaces/:namespace`,
     baseRequestHandler(async (ctx) => {
       const { req, res, user } = ctx
-      const namespaceName = getNamespace(user.id, req.params.namespace)
+      const namespaceName = getNamespace(req.params.namespace)
       try {
         const client = getKubernetesClient(undefined, k8s.CoreV1Api)
         await client.deleteNamespace(namespaceName)

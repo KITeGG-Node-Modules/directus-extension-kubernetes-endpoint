@@ -23,9 +23,9 @@ export function postNamespace(router, context) {
         return validationErrors
       }
       const namespaceObject = {
-        name: getNamespace(user.id, req.body.name),
+        name: getNamespace(req.body.name),
       }
-      const namespace = makeNamespace(namespaceObject)
+      const namespace = makeNamespace(namespaceObject, user.id)
       try {
         const client = getKubernetesClient(undefined, k8s.CoreV1Api)
         await client.createNamespace(namespace)
