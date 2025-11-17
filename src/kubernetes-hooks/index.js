@@ -40,8 +40,7 @@ export default (...args) => {
     'k8s_namespaces.items',
     'Namespace',
     NAMESPACE_K8S_PROPS,
-    validateNamespace,
-    true
+    validateNamespace
   )
   genericAction(
     args,
