@@ -39,7 +39,14 @@ export function genericAction(args, key, k8sProps, createFunc, removeFunc) {
   })
 }
 
-export function genericFilter(args, key, k8sKey, k8sProps, validateFunc) {
+export function genericFilter(
+  args,
+  key,
+  k8sKey,
+  k8sProps,
+  validateFunc,
+  blockUpdate = false
+) {
   const [{ filter }, { services }] = args
 
   filter(`${key}.create`, async (payload) => {
@@ -48,6 +55,14 @@ export function genericFilter(args, key, k8sKey, k8sProps, validateFunc) {
 
   filter(`${key}.update`, async (payload, meta, context) => {
     if (needsDeploy(payload, k8sProps)) {
+      if (blockUpdate) {
+        const CreateError = createError(
+          'BAD_REQUEST',
+          'api_errors.no_update_allowed',
+          400
+        )
+        throw new CreateError()
+      }
       genericValidation(payload, validateFunc)
       await checkForNamespaceChange(
         { payload, meta, context, services },
