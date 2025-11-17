@@ -2,8 +2,8 @@ import { createError } from '@directus/errors'
 import { needsDeploy } from './helpers.js'
 import { checkForNamespaceChange, forwardToKubernetes } from './k8s.js'
 
-export function genericValidation(payload, validateFunc) {
-  const result = validateFunc(payload)
+export async function genericValidation(payload, validateFunc) {
+  const result = await validateFunc(payload)
   if (result && result.length > 0) {
     const errors = result
       .reduce((acc, curr) => {
@@ -50,7 +50,19 @@ export function genericFilter(
   const [{ filter }, { services }] = args
 
   filter(`${key}.create`, async (payload) => {
-    if (needsDeploy(payload, k8sProps)) genericValidation(payload, validateFunc)
+    if (needsDeploy(payload, k8sProps)) {
+      try {
+        await genericValidation(payload, validateFunc)
+      } catch (error) {
+        console.error('Validation error for create', key, error.message)
+        const CreateError = createError(
+          'BAD_REQUEST',
+          'api_errors.validation_internal_error',
+          400
+        )
+        throw new CreateError()
+      }
+    }
   })
 
   filter(`${key}.update`, async (payload, meta, context) => {
@@ -63,7 +75,17 @@ export function genericFilter(
         )
         throw new CreateError()
       }
-      genericValidation(payload, validateFunc)
+      try {
+        await genericValidation(payload, validateFunc)
+      } catch (error) {
+        console.error('Validation error for update', key, error.message)
+        const CreateError = createError(
+          'BAD_REQUEST',
+          'api_errors.validation_internal_error',
+          400
+        )
+        throw new CreateError()
+      }
       await checkForNamespaceChange(
         { payload, meta, context, services },
         key.split('.').shift(),

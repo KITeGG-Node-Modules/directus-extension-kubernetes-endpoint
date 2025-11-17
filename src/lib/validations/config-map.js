@@ -1,6 +1,6 @@
 import validate from 'validate.js'
 
-export function validateConfigMap(payload) {
+export async function validateConfigMap(payload) {
   const validationErrors = validate(payload, {
     name: {
       type: 'string',

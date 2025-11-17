@@ -1,6 +1,6 @@
 import validate from 'validate.js'
 
-export function validateSecret(payload) {
+export async function validateSecret(payload) {
   const validationErrors = validate(payload, {
     name: {
       type: 'string',

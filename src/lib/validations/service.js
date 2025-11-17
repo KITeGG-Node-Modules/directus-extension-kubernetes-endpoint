@@ -1,6 +1,6 @@
 import validate from 'validate.js'
 
-export function validateService(service) {
+export async function validateService(service) {
   const validationErrors = validate(service, {
     name: {
       type: 'string',

@@ -1,6 +1,6 @@
 import validate from 'validate.js'
 
-export function validateVolume(payload) {
+export async function validateVolume(payload) {
   const validationErrors = validate(payload, {
     name: {
       type: 'string',

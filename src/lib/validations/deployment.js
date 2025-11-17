@@ -1,7 +1,7 @@
 import validate from 'validate.js'
 import { GPU_PROFILES } from '../variables.js'
 
-export function validateDeployment(deployment, userGroups = []) {
+export async function validateDeployment(deployment, userGroups = []) {
   const isManagement = !!userGroups.find((group) => group.name === 'management')
   const gpuProps = {}
   for (const profile of GPU_PROFILES) {
