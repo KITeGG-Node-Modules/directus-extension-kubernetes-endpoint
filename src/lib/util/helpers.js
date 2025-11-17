@@ -12,14 +12,20 @@ export function parseNamespace(namespace) {
 export function getHostnameSlug(str) {
   if (!str || str.length === 0)
     throw new Error('Empty string supplied as hostname')
-  return slugify(str.trim().replace(/^[^a-zA-Z]*|[^a-zA-Z0-9]*$/g, ''), {
-    separator: '-',
-    lowercase: true,
-    decamelize: true,
-    preserveLeadingUnderscore: false,
-    preserveTrailingDash: false,
-    transliterate: true,
-  })
+  return slugify(
+    str
+      .trim()
+      .replace(/^[^a-zA-Z]*|[^a-zA-Z0-9]*$/g, '')
+      .toLowerCase(),
+    {
+      separator: '-',
+      lowercase: true,
+      decamelize: true,
+      preserveLeadingUnderscore: false,
+      preserveTrailingDash: false,
+      transliterate: true,
+    }
+  )
 }
 
 export function isSuffixedVolumeName(name) {
