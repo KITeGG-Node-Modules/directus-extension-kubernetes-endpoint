@@ -14,10 +14,11 @@ export async function checkReservation(req, services, deployment) {
     accountability: req.accountability,
   })
   const data = parse(deployment.data)
+  const replicas = typeof data.replicas === 'number' ? data.replicas : 1
   const deploymentProfiles = (data.containers || []).reduce((p, c) => {
     if (!c.gpu || !c.gpu.length) return p
-    if (!p[c.gpu]) p[c.gpu] = c.gpuCount || 1
-    else p[c.gpu] += c.gpuCount || 1
+    if (!p[c.gpu]) p[c.gpu] = (c.gpuCount || 1) * replicas
+    else p[c.gpu] += (c.gpuCount || 1) * replicas
     return p
   }, {})
   if (!Object.keys(deploymentProfiles).length) return true
