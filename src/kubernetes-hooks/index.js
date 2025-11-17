@@ -1,6 +1,10 @@
 import { genericAction, genericFilter } from '../lib/util/hooks.js'
 
 import {
+  createNamespace,
+  removeNamespace,
+} from '../lib/operations/namespace.js'
+import {
   createOrReplaceDeployment,
   removeDeployment,
 } from '../lib/operations/deployment.js'
@@ -20,12 +24,33 @@ import {
   createOrReplaceConfigMap,
   removeConfigMap,
 } from '../lib/operations/config-map.js'
+import { validateNamespace } from '../lib/validations/namespace.js'
 import { validateService } from '../lib/validations/service.js'
 import { validateVolume } from '../lib/validations/volume.js'
 import { validateSecret } from '../lib/validations/secret.js'
 import { validateDeployment } from '../lib/validations/deployment.js'
 
 export default (...args) => {
+  //
+  // Deployments
+
+  const NAMESPACE_K8S_PROPS = ['name']
+  genericFilter(
+    args,
+    'k8s_namespaces.items',
+    'Namespace',
+    NAMESPACE_K8S_PROPS,
+    validateNamespace,
+    true
+  )
+  genericAction(
+    args,
+    'k8s_namespaces.items',
+    NAMESPACE_K8S_PROPS,
+    createNamespace,
+    removeNamespace
+  )
+
   //
   // Deployments
 
