@@ -6,6 +6,7 @@ import { getNamespace } from '../util/helpers.js'
 
 export async function createNamespace(object, userId) {
   const namespaceObject = {
+    ...object,
     name: getNamespace(object.name),
   }
   const payload = makeNamespace(namespaceObject, userId)
