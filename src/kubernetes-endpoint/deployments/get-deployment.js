@@ -22,10 +22,7 @@ export function getDeployment(router, context) {
         return { message: 'api_errors.not_found' }
       }
       try {
-        const deploymentNamespace = getNamespace(
-          deploymentObject.user_created,
-          deploymentObject.namespace
-        )
+        const deploymentNamespace = getNamespace(deploymentObject.namespace)
         const appsClient = getKubernetesClient(
           deploymentNamespace,
           k8s.AppsV1Api

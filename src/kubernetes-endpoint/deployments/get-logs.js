@@ -26,10 +26,7 @@ export function getLogs(router, context) {
         return { message: 'api_errors.not_found' }
       }
       try {
-        const deploymentNamespace = getNamespace(
-          deployment.user_created,
-          deployment.namespace
-        )
+        const deploymentNamespace = getNamespace(deployment.namespace)
         const coreClient = getKubernetesClient(deploymentNamespace)
         const sinceSeconds = req.query.sinceSeconds
           ? parseInt(req.query.sinceSeconds)

@@ -1,33 +1,11 @@
-import slugify from 'slugify'
-import {
-  NAMESPACE_PREFIX,
-  NAMESPACE_PREFIX_FULL_LENGTH,
-  UUID_LENGTH,
-} from '../variables.js'
+import { NAMESPACE_PREFIX, NAMESPACE_PREFIX_LENGTH } from '../variables.js'
 
-export function getNameSlug(name) {
-  return slugify(name, {
-    replacement: '-',
-    lower: true,
-    strict: true,
-    trim: true,
-  })
-}
-
-export function getDeploymentName(user, name) {
-  const nameSlug = getNameSlug(name)
-  return `sd-${nameSlug}`
-}
-
-export function getNamespace(userId, namespace) {
-  return `${NAMESPACE_PREFIX}${userId}-${namespace}`
+export function getNamespace(namespace) {
+  return `${NAMESPACE_PREFIX}${namespace}`
 }
 
 export function parseNamespace(namespace) {
-  return {
-    user: namespace.slice(NAMESPACE_PREFIX.length, UUID_LENGTH),
-    name: namespace.slice(NAMESPACE_PREFIX_FULL_LENGTH),
-  }
+  return namespace.slice(NAMESPACE_PREFIX_LENGTH)
 }
 
 export function isSuffixedVolumeName(name) {

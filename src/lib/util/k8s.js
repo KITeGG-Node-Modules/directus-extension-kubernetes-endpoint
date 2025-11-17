@@ -8,7 +8,7 @@ export function genericMetadata(payload, userId) {
   const metadata = new k8s.V1ObjectMeta()
   metadata.name = payload.name
   if (userId && payload.namespace)
-    metadata.namespace = getNamespace(userId, payload.namespace)
+    metadata.namespace = getNamespace(payload.namespace)
   const labels = {}
   if (userId) labels[`${LABEL_NAMESPACE}/userId`] = userId
   if (payload.id) labels[`${LABEL_NAMESPACE}/objectId`] = payload.id
@@ -77,8 +77,7 @@ export async function checkForNamespaceChange(
             try {
               await client[`deleteNamespaced${k8sType}`](
                 item.name,
-                // TOOD: What to do about other people's namespaces?
-                getNamespace(context.accountability.user, item.namespace)
+                getNamespace(item.namespace)
               )
             } catch (err) {
               console.error(

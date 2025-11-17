@@ -3,9 +3,7 @@ export const API_VERSION = 'v2'
 export const NAMESPACE_PREFIX = 'user-'
 
 export const ROUTE_PREFIX = `/${API_VERSION}`
-export const UUID_LENGTH = 36
-export const NAMESPACE_PREFIX_FULL_LENGTH =
-  NAMESPACE_PREFIX.length + UUID_LENGTH + 1
+export const NAMESPACE_PREFIX_LENGTH = NAMESPACE_PREFIX.length
 
 export const GPU_NVIDIA_FULL = 'nvidia.com/gpu'
 export const GPU_NVIDIA_MIG_1G_10 = 'nvidia.com/mig-1g.10gb'

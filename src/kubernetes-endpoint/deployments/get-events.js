@@ -27,10 +27,7 @@ export function getEvents(router, context) {
         return { message: 'api_errors.not_found' }
       }
       try {
-        const deploymentNamespace = getNamespace(
-          deployment.user_created,
-          deployment.namespace
-        )
+        const deploymentNamespace = getNamespace(deployment.namespace)
         const eventsClient = getKubernetesClient(
           deploymentNamespace,
           k8s.EventsV1Api

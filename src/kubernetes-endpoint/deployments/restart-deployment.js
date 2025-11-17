@@ -23,10 +23,7 @@ export function restartDeployment(router, context) {
         return { message: 'api_errors.not_found' }
       }
       try {
-        const deploymentNamespace = getNamespace(
-          deployment.user_created,
-          deployment.namespace
-        )
+        const deploymentNamespace = getNamespace(deployment.namespace)
         const client = getKubernetesClient(deploymentNamespace, k8s.AppsV1Api)
         const { body: existing } = await client.listNamespacedDeployment(
           deploymentNamespace,
