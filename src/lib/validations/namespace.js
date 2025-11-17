@@ -1,6 +1,17 @@
 import validate from 'validate.js'
+import { getNamespace } from '../util/helpers.js'
 
-export function validateNamespace(namespace) {
+export async function validateNamespace(namespace) {
+  const { body: existing } = await client.listNamespace(
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    `metadata.name=${getNamespace(namespace.name)}`
+  )
+  if (existing.items?.length === 1)
+    return [{ message: 'api_errors.namespace_exists' }]
+
   const validationErrors = validate(namespace, {
     name: {
       presence: true,
