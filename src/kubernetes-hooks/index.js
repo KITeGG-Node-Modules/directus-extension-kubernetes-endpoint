@@ -148,5 +148,5 @@ export default (...args) => {
   //
   // Ingress
 
-  genericFilter(args, 'k8s_ingresses.items', undefined, [], validateNamespace)
+  genericFilter(args, 'k8s_ingress.items', undefined, [], validateNamespace)
 }
