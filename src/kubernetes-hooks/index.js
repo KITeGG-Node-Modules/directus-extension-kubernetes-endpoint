@@ -32,7 +32,7 @@ import { validateDeployment } from '../lib/validations/deployment.js'
 
 export default (...args) => {
   //
-  // Deployments
+  // Namespaces
 
   const NAMESPACE_K8S_PROPS = ['name']
   genericFilter(
@@ -144,4 +144,9 @@ export default (...args) => {
     createOrReplaceConfigMap,
     removeConfigMap
   )
+
+  //
+  // Ingress
+
+  genericFilter(args, 'k8s_ingresses.items', undefined, [], validateNamespace)
 }
