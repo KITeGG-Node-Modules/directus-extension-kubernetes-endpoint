@@ -21,6 +21,9 @@ export function makeContainer(c) {
 
   if (c.resources) {
     container.resources = new k8s.V1ResourceRequirements()
+    if (typeof c.resources.requests?.memory === 'number') {
+      c.resources.requests.memory = `${c.resources.requests.memory}Gi`
+    }
     container.resources.requests = Object.assign({}, c.resources.requests)
     container.resources.limits = Object.assign(
       {},
