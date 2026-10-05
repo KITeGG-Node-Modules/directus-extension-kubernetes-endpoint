@@ -15,6 +15,8 @@ export function makeStatefulSet(name, deployment) {
   statefulSet.metadata = metadata
   const spec = new k8s.V1StatefulSetSpec()
   spec.replicas = deployment.replicas || 1
+  if (deployment.podManagementPolicy)
+    spec.podManagementPolicy = deployment.podManagementPolicy
   spec.serviceName = name
   const selector = new k8s.V1LabelSelector()
   selector.matchLabels = {

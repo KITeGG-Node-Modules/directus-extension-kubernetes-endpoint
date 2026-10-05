@@ -20,6 +20,10 @@ export function validateDeployment(deployment, userGroups = []) {
         lessThanOrEqualTo: 16,
       },
     },
+    podManagementPolicy: {
+      type: 'string',
+      inclusion: ['OrderedReady', 'Parallel'],
+    },
     restartPolicy: {
       type: 'string',
       inclusion: ['Always', 'OnFailure', 'Never'],
