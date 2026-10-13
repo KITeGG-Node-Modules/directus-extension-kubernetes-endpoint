@@ -15,7 +15,8 @@ export function getNameSlug(name) {
 }
 
 export function getDeploymentName(name) {
-  const nameSlug = getNameSlug(name)
+  // Directus ids may be numeric; slugify requires a string
+  const nameSlug = getNameSlug(String(name))
   return `sd-${nameSlug}`
 }
 
@@ -83,7 +84,7 @@ export function handleErrorResponse(res, err) {
   res.status(500)
   return {
     message: 'api_errors.internal_error',
-    detail: err?.message,
+    detail: err?.message ?? err?.body?.message,
   }
 }
 

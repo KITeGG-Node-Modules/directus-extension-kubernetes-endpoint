@@ -1,4 +1,5 @@
 import validate from 'validate.js'
+import { GPU_RESOURCE_NAMES } from './gpu-profiles.js'
 
 export function validateContainer(
   container,

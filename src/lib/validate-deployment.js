@@ -38,9 +38,9 @@ export function validateDeployment(deployment, userGroups = []) {
     return validationErrors
   }
 
-  // validate.js' presence check passes for empty arrays
+  // validate.js' presence check only rejects missing values
   if (deployment.containers.length === 0) {
-    return [{ containers: ["can't be blank"] }]
+    return [{ containers: ["Containers can't be blank"] }]
   }
 
   // Pod-level filesystem ownership can only be set once; containers

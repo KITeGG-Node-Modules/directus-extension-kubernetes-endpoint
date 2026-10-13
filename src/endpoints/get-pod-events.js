@@ -4,7 +4,7 @@ import { getDeploymentName, handleErrorResponse } from '../lib/util.js'
 import { getOwnedPod } from '../lib/get-owned-pod.js'
 
 export async function getDeploymentPodEvents(ctx) {
-  const { req, res, user } = ctx
+  const { req, res } = ctx
   const { podName } = req.params
   if (!podName) {
     res.status(400)

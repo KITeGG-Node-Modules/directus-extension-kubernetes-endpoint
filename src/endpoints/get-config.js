@@ -4,7 +4,7 @@ import { loadDeployment } from '../lib/resolve-deployment.js'
 import { getDeploymentName, handleErrorResponse } from '../lib/util.js'
 
 export async function getDeploymentConfig(ctx) {
-  const { res, user } = ctx
+  const { res } = ctx
   const deployment = await loadDeployment(ctx)
   if (!deployment) {
     return { message: 'api_errors.not_found' }

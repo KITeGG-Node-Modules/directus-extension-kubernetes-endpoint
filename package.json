@@ -20,11 +20,16 @@
 		"build": "directus-extension build",
 		"dev": "directus-extension build -w --no-minify",
 		"link": "directus-extension link",
-		"format": "prettier -w src/"
+		"format": "prettier -w src/",
+		"lint": "eslint src/ test/",
+		"test": "vitest run"
 	},
 	"devDependencies": {
 		"@directus/extensions-sdk": "10.3.4",
-		"prettier": "^3.2.5"
+		"eslint": "^9.39.5",
+		"globals": "^17.13.0",
+		"prettier": "^3.2.5",
+		"vitest": "^5.0.4"
 	},
 	"dependencies": {
 		"@kubernetes/client-node": "0.18.1",
