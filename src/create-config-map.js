@@ -7,7 +7,8 @@ export async function createConfigMap(configMap, statefulSetName) {
   return upsert({
     read: () =>
       client.readNamespacedConfigMap(statefulSetName, servicesNamespace),
-    create: () => client.createNamespacedConfigMap(servicesNamespace, configMap),
+    create: () =>
+      client.createNamespacedConfigMap(servicesNamespace, configMap),
     update: () =>
       client.replaceNamespacedConfigMap(
         statefulSetName,

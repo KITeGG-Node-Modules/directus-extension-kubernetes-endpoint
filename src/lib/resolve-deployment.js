@@ -1,7 +1,4 @@
-import {
-  deploymentOwnerField,
-  enforceDeploymentOwnership,
-} from './config.js'
+import { deploymentOwnerField, enforceDeploymentOwnership } from './config.js'
 import { COLLECTIONS } from './constants.js'
 
 /**

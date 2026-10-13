@@ -25,7 +25,11 @@ export async function putDeploymentSecret(ctx) {
     } else {
       secretData = req.body?.data
     }
-    if (!secretData || typeof secretData !== 'object' || Array.isArray(secretData)) {
+    if (
+      !secretData ||
+      typeof secretData !== 'object' ||
+      Array.isArray(secretData)
+    ) {
       res.status(400)
       return { message: 'api_errors.bad_request' }
     }

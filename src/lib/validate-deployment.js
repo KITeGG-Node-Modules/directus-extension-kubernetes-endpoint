@@ -129,9 +129,7 @@ export function validateDeployment(deployment, userGroups = []) {
           !isSuffixedVolumeName(volume.name)
         ) {
           validationErrors.push({
-            volumes: [
-              `'${volume.name}' needs a size or an emptyDir.sizeLimit`,
-            ],
+            volumes: [`'${volume.name}' needs a size or an emptyDir.sizeLimit`],
           })
         }
         volumeNames.add(volume.name)

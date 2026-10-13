@@ -18,13 +18,21 @@ describe('makeStatefulSet', () => {
     expect(statefulSet.spec.template.spec.nodeSelector).toEqual({
       'node-role.kubernetes.io/worker': 'worker',
     })
-    expect(servicePayloads).toEqual([{ name: 'app', ports: [{ name: 'http', port: 80 }] }])
+    expect(servicePayloads).toEqual([
+      { name: 'app', ports: [{ name: 'http', port: 80 }] },
+    ])
   })
 
   it('uses a pod security context for filesystem ownership', () => {
     const { statefulSet } = makeStatefulSet('sd-5', {
       containers: [
-        { name: 'app', image: 'app', fsUser: 1000, fsGroup: 1000, changeGroupOnMismatch: true },
+        {
+          name: 'app',
+          image: 'app',
+          fsUser: 1000,
+          fsGroup: 1000,
+          changeGroupOnMismatch: true,
+        },
       ],
     })
     const securityContext = statefulSet.spec.template.spec.securityContext

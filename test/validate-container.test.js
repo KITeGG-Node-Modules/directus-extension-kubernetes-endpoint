@@ -3,9 +3,9 @@ import { validateContainer } from '../src/lib/validate-container.js'
 
 describe('validateContainer', () => {
   it('accepts a minimal container', () => {
-    expect(
-      validateContainer({ name: 'nginx', image: 'nginx:latest' })
-    ).toEqual([])
+    expect(validateContainer({ name: 'nginx', image: 'nginx:latest' })).toEqual(
+      []
+    )
   })
 
   it('rejects invalid gpu resources', () => {
@@ -20,8 +20,9 @@ describe('validateContainer', () => {
   it('caps gpuCount by group membership', () => {
     const base = { name: 'app', image: 'app', gpu: 'nvidia.com/gpu' }
     expect(validateContainer({ ...base, gpuCount: 2 })).toEqual([])
-    expect(validateContainer({ ...base, gpuCount: 8 }, [], []).length)
-      .toBeGreaterThan(0)
+    expect(
+      validateContainer({ ...base, gpuCount: 8 }, [], []).length
+    ).toBeGreaterThan(0)
     expect(
       validateContainer({ ...base, gpuCount: 8 }, [], [{ name: 'management' }])
     ).toEqual([])

@@ -49,8 +49,13 @@ describe('makeContainer', () => {
 
   it('registers services only when payloads are collected', () => {
     const payloads = []
-    makeContainer({ name: 'app', image: 'app', ports: [{ name: 'http', port: 80 }] }, payloads)
-    expect(payloads).toEqual([{ name: 'app', ports: [{ name: 'http', port: 80 }] }])
+    makeContainer(
+      { name: 'app', image: 'app', ports: [{ name: 'http', port: 80 }] },
+      payloads
+    )
+    expect(payloads).toEqual([
+      { name: 'app', ports: [{ name: 'http', port: 80 }] },
+    ])
 
     // init containers pass no payload collector
     makeContainer(

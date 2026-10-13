@@ -18,10 +18,7 @@ export default {
   handler: (router, context) => {
     router.get('/capacity', baseRequestHandler(getCapacity, context))
 
-    router.get(
-      '/deployments/:id',
-      baseRequestHandler(getDeployment, context)
-    )
+    router.get('/deployments/:id', baseRequestHandler(getDeployment, context))
 
     router.post(
       '/deployments/:id/hooks/restart',
@@ -38,7 +35,10 @@ export default {
       baseRequestHandler(getDeploymentPodEvents, context)
     )
 
-    router.patch('/deployments/:id', baseRequestHandler(scaleDeployment, context))
+    router.patch(
+      '/deployments/:id',
+      baseRequestHandler(scaleDeployment, context)
+    )
 
     router.delete(
       '/deployments/:id',
@@ -50,7 +50,10 @@ export default {
       baseRequestHandler(deleteDeploymentPod, context)
     )
 
-    router.put('/deployments/:id', baseRequestHandler(deployDeployment, context))
+    router.put(
+      '/deployments/:id',
+      baseRequestHandler(deployDeployment, context)
+    )
 
     router.put(
       '/deployments/:id/secret',

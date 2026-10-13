@@ -1,9 +1,6 @@
 import k8s from '@kubernetes/client-node'
 import { servicesNamespace } from './config.js'
-import {
-  NODE_SELECTOR,
-  RESTART_ANNOTATION_KEY,
-} from './constants.js'
+import { NODE_SELECTOR, RESTART_ANNOTATION_KEY } from './constants.js'
 import { makeVolumeClaim } from './make-volume-claim.js'
 import { makeContainer } from './make-container.js'
 import { isSuffixedVolumeName } from './util.js'
