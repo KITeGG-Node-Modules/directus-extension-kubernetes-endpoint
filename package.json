@@ -3,6 +3,7 @@
 	"description": "Directus custom endpoint for deploying StatefulSets and attached resources to a Kubernetes cluster",
 	"icon": "extension",
 	"version": "1.0.0",
+	"license": "EUPL-1.2",
 	"private": true,
 	"keywords": [
 		"directus",

@@ -373,3 +373,19 @@ DELETE /kubernetes/deployments/<deployment ID>/pods/<pod name>
 
 Note that the pod will be deleted, but a new one will immediately be created. This can be used to restart a deployment's
 pod. Only pods belonging to this deployment can be deleted; pod names from other deployments return a 404 response.
+
+## License
+
+Licensed under the EUPL, Version 1.2 or — as soon they will be approved by the European Commission — subsequent versions of the EUPL (the "Licence").
+
+You may not use this work except in compliance with the Licence.
+
+You may obtain a copy of the Licence at:
+
+https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
+
+A copy is also included in the [`LICENSE`](LICENSE) file.
+
+Unless required by applicable law or agreed to in writing, software distributed under the Licence is distributed on an "AS IS" basis, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+
+See the Licence for the specific language governing permissions and limitations under the Licence.

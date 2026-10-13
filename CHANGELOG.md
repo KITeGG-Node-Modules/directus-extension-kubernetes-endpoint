@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Deployment ownership enforcement on all mutating endpoints: non-admin users can only scale, restart, delete, or change the secret and config of deployments they own. Ownership derives from the deployment's `user_created`, `user_updated` and `authors` fields; `DEPLOYMENT_AUTHORS_FIELD` configures the authors list (an empty value disables that source) and `ENFORCE_DEPLOYMENT_OWNERSHIP=false` disables the check entirely
 - Required Kubernetes RBAC documented, with a ready-to-apply `k8s/rbac.yaml` manifest
 - Test suite (Vitest), ESLint and CI
+- Licensed under the EUPL, Version 1.2
 
 ### Changed
 
