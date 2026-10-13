@@ -1,5 +1,13 @@
 import { getKubernetesClient } from 'kitegg-directus-extension-common'
 
+function aggregate(target, source) {
+  for (const key in source) {
+    const value = parseFloat(source[key])
+    if (key in target) target[key] += value
+    else target[key] = value
+  }
+}
+
 export async function getWorkers() {
   const client = getKubernetesClient()
   const response = await client.listNode()
@@ -27,16 +35,15 @@ export async function getWorkers() {
       requests: {},
     }
     for (const container of containers) {
-      if (container.resources.limits && container.resources.requests) {
-        for (const type in worker.resources) {
-          for (const key in container.resources[type]) {
-            let value = parseFloat(container.resources[type][key])
-            if (worker.resources[type][key])
-              worker.resources[type][key] += value
-            else worker.resources[type][key] = value
-          }
-        }
-      }
+      const { limits = {}, requests = {} } = container.resources || {}
+      // Kubernetes defaults unspecified requests to the corresponding
+      // limits, so containers that only define limits (e.g. the GPU
+      // workloads deployed by this extension) count towards the requested
+      // totals. Conversely, containers that only define requests (the
+      // common case for workloads not deployed by this extension) count
+      // towards the requested, but not the limits, totals.
+      aggregate(worker.resources.requests, { ...limits, ...requests })
+      aggregate(worker.resources.limits, limits)
     }
   }
   return workers

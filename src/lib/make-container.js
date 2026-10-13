@@ -24,6 +24,11 @@ export function makeContainer(c, servicePayloads, statefulSetName) {
       memory: `${c.memory || 32.0}Gi`,
       [c.gpu]: c.gpuCount || 1,
     }
+    // Extended resources cannot be overcommitted, so requests must equal the
+    // limits; declaring them explicitly makes the reserved resources visible
+    // to cluster capacity accounting instead of relying on Kubernetes'
+    // implicit defaulting of requests from limits.
+    container.resources.requests = { ...container.resources.limits }
   }
 
   if (Array.isArray(c.ports)) {
