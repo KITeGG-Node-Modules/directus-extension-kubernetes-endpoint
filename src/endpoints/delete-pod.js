@@ -1,4 +1,4 @@
-import { getKubernetesClient } from 'kitegg-directus-extension-common'
+import { getKubernetesClient } from '../lib/get-kubernetes-client.js'
 import { checkReservation } from '../lib/check-reservation.js'
 import { servicesNamespace } from '../lib/config.js'
 import { isDeploymentOwner, loadDeployment } from '../lib/resolve-deployment.js'

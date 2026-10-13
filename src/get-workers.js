@@ -1,4 +1,4 @@
-import { getKubernetesClient } from 'kitegg-directus-extension-common'
+import { getKubernetesClient } from './lib/get-kubernetes-client.js'
 import { sumPodResources } from './lib/node-resources.js'
 
 export async function getWorkers() {

@@ -1,4 +1,4 @@
-import { getKubernetesClient } from 'kitegg-directus-extension-common'
+import { getKubernetesClient } from './get-kubernetes-client.js'
 import { servicesNamespace } from './config.js'
 
 // Fetches a pod by name and verifies that it belongs to the StatefulSet of

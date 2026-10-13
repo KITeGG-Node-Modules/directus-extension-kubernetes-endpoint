@@ -1,4 +1,4 @@
-import { getKubernetesClient } from 'kitegg-directus-extension-common'
+import { getKubernetesClient } from './lib/get-kubernetes-client.js'
 import k8s from '@kubernetes/client-node'
 import { getDeploymentName } from './lib/util.js'
 import { servicesNamespace } from './lib/config.js'
