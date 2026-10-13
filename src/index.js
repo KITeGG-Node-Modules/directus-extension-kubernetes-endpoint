@@ -29,7 +29,13 @@ export default {
   handler: (router, context) => {
     router.get(
       '/capacity',
-      baseRequestHandler(() => getClusterCapacity(), context)
+      baseRequestHandler(async ({ res }) => {
+        try {
+          return await getClusterCapacity()
+        } catch (err) {
+          return handleErrorResponse(res, err)
+        }
+      }, context)
     )
 
     router.get(
