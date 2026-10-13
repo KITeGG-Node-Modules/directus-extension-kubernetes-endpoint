@@ -1,23 +1,17 @@
 import { getKubernetesClient } from 'kitegg-directus-extension-common'
 import { servicesNamespace } from './lib/config.js'
+import { upsert } from './lib/upsert.js'
 
-export async function createSecret(res, secret, statefulSetName) {
+export async function createSecret(secret, statefulSetName) {
   const client = getKubernetesClient(servicesNamespace)
-  const { body: existing } = await client.listNamespacedSecret(
-    servicesNamespace,
-    undefined,
-    undefined,
-    undefined,
-    `metadata.name=${statefulSetName}`
-  )
-  if (existing.items.length === 1) {
-    await client.replaceNamespacedSecret(
-      statefulSetName,
-      servicesNamespace,
-      secret
-    )
-  } else {
-    await client.createNamespacedSecret(servicesNamespace, secret)
-    res.status(201)
-  }
+  return upsert({
+    read: () => client.readNamespacedSecret(statefulSetName, servicesNamespace),
+    create: () => client.createNamespacedSecret(servicesNamespace, secret),
+    update: () =>
+      client.replaceNamespacedSecret(
+        statefulSetName,
+        servicesNamespace,
+        secret
+      ),
+  })
 }

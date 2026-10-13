@@ -437,8 +437,13 @@ export default {
           statefulSetName,
           deploymentData
         )
+        let created = false
         try {
-          await createStatefulSet(res, statefulSet, statefulSetName)
+          const statefulSetResult = await createStatefulSet(
+            statefulSet,
+            statefulSetName
+          )
+          created = statefulSetResult.created
         } catch (err) {
           return handleErrorResponse(res, err)
         }
@@ -451,12 +456,14 @@ export default {
             payload.ports
           )
           try {
-            await createService(res, service, serviceName)
+            const serviceResult = await createService(service, serviceName)
+            created = created || serviceResult.created
           } catch (err) {
             return handleErrorResponse(res, err)
           }
         }
 
+        if (created) res.status(201)
         return deploymentData
       }, context)
     )
@@ -500,7 +507,8 @@ export default {
         }
         const secret = makeSecret(statefulSetName, secretData)
         try {
-          await createSecret(res, secret, statefulSetName)
+          const { created } = await createSecret(secret, statefulSetName)
+          if (created) res.status(201)
         } catch (err) {
           return handleErrorResponse(res, err)
         }
@@ -581,7 +589,11 @@ export default {
         if (Object.keys(configMapData).length) {
           const configMap = makeConfigMap(statefulSetName, configMapData)
           try {
-            await createConfigMap(res, configMap, statefulSetName)
+            const { created } = await createConfigMap(
+              configMap,
+              statefulSetName
+            )
+            if (created) res.status(201)
           } catch (err) {
             return handleErrorResponse(res, err)
           }

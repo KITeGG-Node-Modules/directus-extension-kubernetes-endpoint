@@ -1,23 +1,32 @@
 import { getKubernetesClient } from 'kitegg-directus-extension-common'
+import k8s from '@kubernetes/client-node'
 import { servicesNamespace } from './lib/config.js'
+import { upsert } from './lib/upsert.js'
 
-export async function createService(res, service, serviceName) {
+export async function createService(service, serviceName) {
   const client = getKubernetesClient(servicesNamespace)
-  const { body: existing } = await client.listNamespacedService(
-    servicesNamespace,
-    undefined,
-    undefined,
-    undefined,
-    `metadata.name=${serviceName}`
-  )
-  if (existing.items.length === 1) {
-    await client.replaceNamespacedService(
-      serviceName,
-      servicesNamespace,
-      service
-    )
-  } else {
-    await client.createNamespacedService(servicesNamespace, service)
-    res.status(201)
-  }
+  return upsert({
+    read: () => client.readNamespacedService(serviceName, servicesNamespace),
+    create: () => client.createNamespacedService(servicesNamespace, service),
+    update: async () => {
+      // Services must be patched rather than replaced: spec.clusterIP is
+      // immutable and a full replace of an existing Service fails
+      const options = {
+        headers: {
+          'Content-type': k8s.PatchUtils.PATCH_FORMAT_JSON_MERGE_PATCH,
+        },
+      }
+      await client.patchNamespacedService(
+        serviceName,
+        servicesNamespace,
+        { spec: { ports: service.spec.ports } },
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        options
+      )
+    },
+  })
 }
