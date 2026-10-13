@@ -249,7 +249,8 @@ To return a Pod's log:
 GET /kubernetes/deployments/<service ID>/logs/<pod name>
 ```
 
-The pod name can be taken from the `pods.name` property of the deployment status.
+The pod name can be taken from the `pods.name` property of the deployment status. Only pods belonging to this deployment
+can be accessed; pod names from other deployments return a 404 response.
 
 Optionally, additional settings can be appended as query parameters:
 
@@ -267,6 +268,8 @@ To request events regarding the status of the deployment, poll this endpoint pat
 ``` 
 GET /kubernetes/deployments/<deployment ID>/events/<pod name>
 ```
+
+Only pods belonging to this deployment can be queried; pod names from other deployments return a 404 response.
 
 An example output:
 
@@ -289,4 +292,5 @@ To delete a pod and its containers within a deployment, call:
 DELETE /kubernetes/deployments/<deployment ID>/pods/<pod name>
 ```
 
-Note that the pod will be deleted, but a new one will immediately be created. This can be used to restart a deployment's pod.
+Note that the pod will be deleted, but a new one will immediately be created. This can be used to restart a deployment's
+pod. Only pods belonging to this deployment can be deleted; pod names from other deployments return a 404 response.

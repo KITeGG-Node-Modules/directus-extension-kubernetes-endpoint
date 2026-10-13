@@ -21,6 +21,7 @@ import { createSecret } from './create-secret.js'
 import { makeConfigMap } from './lib/make-config-map.js'
 import { createConfigMap } from './create-config-map.js'
 import { checkReservation } from './lib/check-reservation.js'
+import { getOwnedPod } from './lib/get-owned-pod.js'
 
 export default {
   id: 'kubernetes',
@@ -121,7 +122,7 @@ export default {
     router.get(
       '/deployments/:id/logs/:podName',
       baseRequestHandler(async (ctx) => {
-        const { req, res, services } = ctx
+        const { req, res, user, services } = ctx
         const { podName } = req.params
         if (!podName) {
           res.status(400)
@@ -138,6 +139,12 @@ export default {
           return { message: 'api_errors.not_found' }
         }
         try {
+          const statefulSetName = getDeploymentName(user, deployment.id)
+          const pod = await getOwnedPod(statefulSetName, podName)
+          if (!pod) {
+            res.status(404)
+            return { message: 'api_errors.not_found' }
+          }
           const coreClient = getKubernetesClient(servicesNamespace)
           const sinceSeconds = req.query.sinceSeconds
             ? parseInt(req.query.sinceSeconds)
@@ -166,7 +173,7 @@ export default {
     router.get(
       '/deployments/:id/events/:podName',
       baseRequestHandler(async (ctx) => {
-        const { req, res, services } = ctx
+        const { req, res, user, services } = ctx
         const { podName } = req.params
         if (!podName) {
           res.status(400)
@@ -183,7 +190,13 @@ export default {
           return { message: 'api_errors.not_found' }
         }
         try {
-          return getPodEvents(podName)
+          const statefulSetName = getDeploymentName(user, deployment.id)
+          const pod = await getOwnedPod(statefulSetName, podName)
+          if (!pod) {
+            res.status(404)
+            return { message: 'api_errors.not_found' }
+          }
+          return await getPodEvents(podName)
         } catch (err) {
           return handleErrorResponse(res, err)
         }
@@ -287,7 +300,7 @@ export default {
     router.delete(
       '/deployments/:id/pods/:podName',
       baseRequestHandler(async (ctx) => {
-        const { req, res, services } = ctx
+        const { req, res, user, services } = ctx
         const { podName } = req.params
         if (!podName) {
           res.status(400)
@@ -308,6 +321,12 @@ export default {
           if (!isValid) {
             res.status(400)
             return { message: 'api_errors.not_enough_resources' }
+          }
+          const statefulSetName = getDeploymentName(user, deployment.id)
+          const pod = await getOwnedPod(statefulSetName, podName)
+          if (!pod) {
+            res.status(404)
+            return { message: 'api_errors.not_found' }
           }
           const coreClient = getKubernetesClient(servicesNamespace)
           await coreClient.deleteNamespacedPod(podName, servicesNamespace)
