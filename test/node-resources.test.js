@@ -46,11 +46,13 @@ describe('sumPodResources', () => {
     expect(totals.limits.cpu).toBeUndefined()
   })
 
-  it('handles limits without requests', () => {
+  it('defaults requests to limits when only limits are set', () => {
     const totals = sumPodResources([
       pod('Running', [{ resources: { limits: resources({ cpu: '1' }) } }]),
     ])
     expect(totals.limits.cpu).toBe(1)
-    expect(totals.requests).toEqual({})
+    // Kubernetes defaults unspecified requests to the corresponding
+    // limits, so limits-only containers reserve requested capacity too
+    expect(totals.requests.cpu).toBe(1)
   })
 })
