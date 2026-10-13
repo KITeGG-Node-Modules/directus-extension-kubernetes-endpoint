@@ -1,6 +1,7 @@
 import { baseRequestHandler } from 'kitegg-directus-extension-common'
 import { getCapacity } from './endpoints/capacity.js'
 import { getDeployment } from './endpoints/get-deployment.js'
+import { getDeploymentsState } from './endpoints/get-deployments-state.js'
 import { restartDeployment } from './endpoints/restart-deployment.js'
 import { getPodLogs } from './endpoints/get-pod-logs.js'
 import { getDeploymentPodEvents } from './endpoints/get-pod-events.js'
@@ -19,6 +20,11 @@ export default {
     router.get('/capacity', baseRequestHandler(getCapacity, context))
 
     router.get('/deployments/:id', baseRequestHandler(getDeployment, context))
+
+    router.get(
+      '/deployments-running',
+      baseRequestHandler(getDeploymentsState, context)
+    )
 
     router.post(
       '/deployments/:id/hooks/restart',
