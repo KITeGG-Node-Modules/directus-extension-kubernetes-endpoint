@@ -35,6 +35,29 @@ export function validateDeployment(deployment, userGroups = []) {
     return validationErrors
   }
 
+  // Pod-level filesystem ownership can only be set once; containers
+  // disagreeing on fsUser/fsGroup would silently apply the last value
+  const allContainers = [
+    ...deployment.containers,
+    ...(deployment.initContainers || []),
+  ]
+  const fsUsers = new Set(
+    allContainers.map((c) => c.fsUser).filter((v) => v != null)
+  )
+  const fsGroups = new Set(
+    allContainers.map((c) => c.fsGroup).filter((v) => v != null)
+  )
+  if (fsUsers.size > 1) {
+    validationErrors.push({
+      containers: ['fsUser must be the same for all containers'],
+    })
+  }
+  if (fsGroups.size > 1) {
+    validationErrors.push({
+      containers: ['fsGroup must be the same for all containers'],
+    })
+  }
+
   if (Array.isArray(deployment.initContainers)) {
     for (const container of deployment.initContainers) {
       const containerErrors = validateContainer(container, [], userGroups)

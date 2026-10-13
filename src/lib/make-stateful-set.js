@@ -41,12 +41,15 @@ export function makeStatefulSet(name, deployment) {
 
   function parseContainers(containers) {
     return containers.map((c) => {
+      // Pod-level filesystem ownership: must be a V1PodSecurityContext
+      // (V1SecurityContext does not carry fsUser/fsGroup and would
+      // silently drop them during serialization)
       podSpec.securityContext =
-        podSpec.securityContext || new k8s.V1SecurityContext()
-      if (c.fsUser) {
+        podSpec.securityContext || new k8s.V1PodSecurityContext()
+      if (c.fsUser != null) {
         podSpec.securityContext.fsUser = c.fsUser
       }
-      if (c.fsGroup) {
+      if (c.fsGroup != null) {
         podSpec.securityContext.fsGroup = c.fsGroup
       }
       if (c.changeGroupOnMismatch) {
