@@ -1,4 +1,5 @@
 import k8s from '@kubernetes/client-node'
+import { DEFAULT_CPU, DEFAULT_MEMORY_GI } from './constants.js'
 
 export function makeContainer(c, servicePayloads, statefulSetName) {
   const container = new k8s.V1Container()
@@ -17,13 +18,15 @@ export function makeContainer(c, servicePayloads, statefulSetName) {
     container.securityContext.runAsGroup = c.group
   }
 
+  // Always limit cpu/memory: without limits a container runs BestEffort
+  // and can exhaust worker nodes. GPU resources are added on top.
+  container.resources = new k8s.V1ResourceRequirements()
+  container.resources.limits = {
+    cpu: c.cpu || DEFAULT_CPU,
+    memory: `${c.memory || DEFAULT_MEMORY_GI}Gi`,
+  }
   if (c.gpu) {
-    container.resources = new k8s.V1ResourceRequirements()
-    container.resources.limits = {
-      cpu: c.cpu || 4,
-      memory: `${c.memory || 32.0}Gi`,
-      [c.gpu]: c.gpuCount || 1,
-    }
+    container.resources.limits[c.gpu] = c.gpuCount || 1
     // Extended resources cannot be overcommitted, so requests must equal the
     // limits; declaring them explicitly makes the reserved resources visible
     // to cluster capacity accounting instead of relying on Kubernetes'
