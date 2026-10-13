@@ -1,4 +1,5 @@
 import slugify from 'slugify'
+import { parse } from 'yaml'
 
 export function getNameSlug(name) {
   return slugify(name, {
@@ -12,6 +13,21 @@ export function getNameSlug(name) {
 export function getDeploymentName(user, name) {
   const nameSlug = getNameSlug(name)
   return `sd-${nameSlug}`
+}
+
+/**
+ * Parse the deployment's YAML data, mapping parse failures to a
+ * client-facing 400 error instead of an unhandled 500.
+ */
+export function parseDeploymentData(deployment) {
+  try {
+    return parse(deployment?.data)
+  } catch (err) {
+    const error = new Error(`Invalid deployment data: ${err.message}`)
+    error.statusCode = 400
+    error.extensions = { code: 'INVALID_PAYLOAD' }
+    throw error
+  }
 }
 
 const DIRECTUS_ERROR_KEYS = {

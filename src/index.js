@@ -12,7 +12,11 @@ import { getDeploymentInfo } from './get-deployment-info.js'
 import { getPodEvents } from './get-pod-events.js'
 import { deleteDeployment } from './delete-deployment.js'
 import { createStatefulSet } from './create-stateful-set.js'
-import { getDeploymentName, handleErrorResponse } from './lib/util.js'
+import {
+  getDeploymentName,
+  handleErrorResponse,
+  parseDeploymentData,
+} from './lib/util.js'
 import { createService } from './create-service.js'
 import k8s from '@kubernetes/client-node'
 import { RESTART_ANNOTATION_KEY } from './lib/constants.js'
@@ -80,7 +84,13 @@ export default {
           return { message: 'api_errors.forbidden' }
         }
         try {
-          const isValid = await checkReservation(req, services, deployment)
+          const deploymentData = parseDeploymentData(deployment)
+          const isValid = await checkReservation(
+            req,
+            services,
+            deployment,
+            deploymentData
+          )
           if (!isValid) {
             res.status(400)
             return { message: 'api_errors.not_enough_resources' }
@@ -234,7 +244,13 @@ export default {
           return { message: 'api_errors.forbidden' }
         }
         try {
-          const isValid = await checkReservation(req, services, deployment)
+          const deploymentData = parseDeploymentData(deployment)
+          const isValid = await checkReservation(
+            req,
+            services,
+            deployment,
+            deploymentData
+          )
           if (!isValid) {
             res.status(400)
             return { message: 'api_errors.not_enough_resources' }
@@ -340,7 +356,13 @@ export default {
           return { message: 'api_errors.forbidden' }
         }
         try {
-          const isValid = await checkReservation(req, services, deployment)
+          const deploymentData = parseDeploymentData(deployment)
+          const isValid = await checkReservation(
+            req,
+            services,
+            deployment,
+            deploymentData
+          )
           if (!isValid) {
             res.status(400)
             return { message: 'api_errors.not_enough_resources' }
@@ -378,58 +400,57 @@ export default {
           res.status(403)
           return { message: 'api_errors.forbidden' }
         }
-        const isValid = await checkReservation(req, services, deployment)
+        const statefulSetName = getDeploymentName(user, deployment.id)
+        let deploymentData
+        try {
+          deploymentData = parseDeploymentData(deployment)
+        } catch (err) {
+          return handleErrorResponse(res, err)
+        }
+        if (!deploymentData) {
+          res.status(400)
+          return { message: 'api_errors.bad_request' }
+        }
+        const isValid = await checkReservation(
+          req,
+          services,
+          deployment,
+          deploymentData
+        )
         if (!isValid) {
           res.status(400)
           return { message: 'api_errors.not_enough_resources' }
         }
-        const statefulSetName = getDeploymentName(user, deployment.id)
-        let deploymentData
-        try {
-          deploymentData = parse(deployment.data)
-        } catch (err) {
+        const validationErrors = validateDeployment(deploymentData, userGroups)
+        if (validationErrors) {
           res.status(400)
-          return {
-            errors: [{ data: err.message }],
-          }
+          return validationErrors
         }
-        if (deploymentData) {
-          const validationErrors = validateDeployment(
-            deploymentData,
-            userGroups
-          )
-          if (validationErrors) {
-            res.status(400)
-            return validationErrors
-          }
-          const { statefulSet, servicePayloads } = makeStatefulSet(
+        const { statefulSet, servicePayloads } = makeStatefulSet(
+          statefulSetName,
+          deploymentData
+        )
+        try {
+          await createStatefulSet(res, statefulSet, statefulSetName)
+        } catch (err) {
+          return handleErrorResponse(res, err)
+        }
+
+        for (const payload of servicePayloads) {
+          const serviceName = `${statefulSetName}-${payload.name}`
+          const service = makeService(
             statefulSetName,
-            deploymentData
+            serviceName,
+            payload.ports
           )
           try {
-            await createStatefulSet(res, statefulSet, statefulSetName)
+            await createService(res, service, serviceName)
           } catch (err) {
             return handleErrorResponse(res, err)
           }
-
-          for (const payload of servicePayloads) {
-            const serviceName = `${statefulSetName}-${payload.name}`
-            const service = makeService(
-              statefulSetName,
-              serviceName,
-              payload.ports
-            )
-            try {
-              await createService(res, service, serviceName)
-            } catch (err) {
-              return handleErrorResponse(res, err)
-            }
-          }
-
-          return deploymentData
         }
-        res.status(404)
-        return { message: 'api_errors.not_found' }
+
+        return deploymentData
       }, context)
     )
 
