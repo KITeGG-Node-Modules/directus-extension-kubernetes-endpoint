@@ -5,13 +5,6 @@ export function validateContainer(
   validationErrors = [],
   userGroups = []
 ) {
-  const gpuProfiles = [
-    'nvidia.com/gpu',
-    'nvidia.com/mig-1g.10gb',
-    'nvidia.com/mig-2g.20gb',
-    'nvidia.com/mig-3g.40gb',
-  ]
-  console.log('GROUPS', JSON.stringify(userGroups))
   const isManagement = !!userGroups.find((group) => group.name === 'management')
   const containerErrors = validate(container, {
     name: {
@@ -36,7 +29,7 @@ export function validateContainer(
     },
     gpu: {
       type: 'string',
-      inclusion: gpuProfiles,
+      inclusion: GPU_RESOURCE_NAMES,
     },
     gpuCount: {
       type: 'integer',

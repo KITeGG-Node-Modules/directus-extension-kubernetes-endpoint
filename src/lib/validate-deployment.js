@@ -1,5 +1,6 @@
 import validate from 'validate.js'
 import { validateContainer } from './validate-container.js'
+import { GPU_RESOURCE_NAMES } from './gpu-profiles.js'
 
 export function validateDeployment(deployment, userGroups = []) {
   let validationErrors = []

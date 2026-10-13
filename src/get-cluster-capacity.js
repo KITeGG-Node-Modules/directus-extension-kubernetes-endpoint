@@ -1,19 +1,5 @@
 import { getWorkers } from './get-workers.js'
-
-export function mapResourceNames(resourceName) {
-  switch (resourceName) {
-    case 'nvidia.com/gpu':
-      return 'gpu-l'
-    case 'nvidia.com/mig-1g.10gb':
-      return 'gpu-xs'
-    case 'nvidia.com/mig-2g.20gb':
-      return 'gpu-s'
-    case 'nvidia.com/mig-3g.40gb':
-      return 'gpu-m'
-    default:
-      return resourceName
-  }
-}
+import { resourceToGpuProfile } from './lib/gpu-profiles.js'
 
 export async function getClusterCapacity() {
   const workers = await getWorkers()
@@ -23,13 +9,14 @@ export async function getClusterCapacity() {
     result.available = {}
     for (const key in worker.allocatable) {
       if (key.startsWith('nvidia')) {
-        result.available[mapResourceNames(key)] = worker.allocatable[key]
+        result.available[resourceToGpuProfile(key)] = worker.allocatable[key]
       }
     }
     result.requested = {}
     for (const key in worker.resources.limits) {
       if (key.startsWith('nvidia')) {
-        result.requested[mapResourceNames(key)] = worker.resources.limits[key]
+        result.requested[resourceToGpuProfile(key)] =
+          worker.resources.limits[key]
       }
     }
     results.push(result)

@@ -15,7 +15,7 @@ import { createStatefulSet } from './create-stateful-set.js'
 import { getDeploymentName, handleErrorResponse } from './lib/util.js'
 import { createService } from './create-service.js'
 import k8s from '@kubernetes/client-node'
-import { DateTime } from 'luxon'
+import { RESTART_ANNOTATION_KEY } from './lib/constants.js'
 import { makeSecret } from './lib/make-secret.js'
 import { createSecret } from './create-secret.js'
 import { makeConfigMap } from './lib/make-config-map.js'
@@ -100,7 +100,7 @@ export default {
                 op: 'replace',
                 path: '/spec/template/metadata/annotations',
                 value: {
-                  'llp.kitegg.de/restartedAt': DateTime.now().toISO(),
+                  [RESTART_ANNOTATION_KEY]: new Date().toISOString(),
                 },
               },
             ]

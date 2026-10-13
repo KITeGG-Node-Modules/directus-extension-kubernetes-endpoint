@@ -1,6 +1,9 @@
 import k8s from '@kubernetes/client-node'
 import { servicesNamespace } from './config.js'
-import { DateTime } from 'luxon'
+import {
+  NODE_SELECTOR,
+  RESTART_ANNOTATION_KEY,
+} from './constants.js'
 import { makeVolumeClaim } from './make-volume-claim.js'
 import { makeContainer } from './make-container.js'
 import { isSuffixedVolumeName } from './util.js'
@@ -29,12 +32,10 @@ export function makeStatefulSet(name, deployment) {
     app: name,
   }
   podTemplateSpec.metadata.annotations = {
-    'llp.kitegg.de/restartedAt': DateTime.now().toISO(),
+    [RESTART_ANNOTATION_KEY]: new Date().toISOString(),
   }
   const podSpec = new k8s.V1PodSpec()
-  podSpec.nodeSelector = {
-    'node-role.kubernetes.io/worker': 'worker',
-  }
+  podSpec.nodeSelector = NODE_SELECTOR
   podSpec.restartPolicy = deployment.restartPolicy || 'Always'
   podSpec.enableServiceLinks = false
 

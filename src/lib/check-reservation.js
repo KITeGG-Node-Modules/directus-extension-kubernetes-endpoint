@@ -1,19 +1,19 @@
 import { parse } from 'yaml'
+import { COLLECTIONS } from './constants.js'
+import { gpuProfileToResource } from './gpu-profiles.js'
 
-const gpuProfileMapping = {
-  'gpu-l': 'nvidia.com/gpu',
-  'gpu-m': 'nvidia.com/mig-3g.40gb',
-  'gpu-s': 'nvidia.com/mig-2g.20gb',
-  'gpu-xs': 'nvidia.com/mig-1g.10gb',
-}
-
-export async function checkReservation(req, services, deployment) {
+export async function checkReservation(
+  req,
+  services,
+  deployment,
+  deploymentData
+) {
   const { ItemsService } = services
-  const reservationsService = new ItemsService('gpu_reservations', {
+  const reservationsService = new ItemsService(COLLECTIONS.gpuReservations, {
     schema: req.schema,
     accountability: req.accountability,
   })
-  const data = parse(deployment.data)
+  const data = deploymentData ?? parse(deployment.data)
   const replicas = typeof data.replicas === 'number' ? data.replicas : 1
   const deploymentProfiles = (data.containers || []).reduce((p, c) => {
     if (!c.gpu || !c.gpu.length) return p
@@ -25,23 +25,17 @@ export async function checkReservation(req, services, deployment) {
   const reservations = await reservationsService.readByQuery({
     filter: { deployment: { _eq: deployment.id } },
   })
-  const reservation = reservations.shift()
-  if (reservation) {
-    const profiles = reservation.gpus.reduce((p, c) => {
-      const pStr = gpuProfileMapping[c]
-      if (pStr) {
-        if (p[pStr]) p[pStr] += 1
-        else p[pStr] = 1
-      }
-      return p
-    }, {})
-    let isInvalid = false
-    for (const key in deploymentProfiles) {
-      isInvalid =
-        isInvalid || !profiles[key] || deploymentProfiles[key] > profiles[key]
+  const profiles = (reservations || []).reduce((p, reservation) => {
+    for (const gpu of reservation.gpus || []) {
+      const resource = gpuProfileToResource(gpu)
+      if (resource) p[resource] = (p[resource] ?? 0) + 1
     }
-    return !isInvalid
-  } else {
-    return false
+    return p
+  }, {})
+  let isInvalid = false
+  for (const key in deploymentProfiles) {
+    isInvalid =
+      isInvalid || !profiles[key] || deploymentProfiles[key] > profiles[key]
   }
+  return !isInvalid
 }
