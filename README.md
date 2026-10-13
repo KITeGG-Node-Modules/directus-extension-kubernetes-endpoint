@@ -15,8 +15,15 @@ configs) verify that the requesting user owns the deployment before
 performing any operation; admins always have access. Requests from other
 users are rejected with `403`.
 
-- The owner is read from the deployment's `user` field by default. Set
-  `DEPLOYMENT_OWNER_FIELD` to use a different field name.
+A user owns a deployment when any of the following match their user id:
+
+- the deployment's `user_created` field (who created the item),
+- the deployment's `user_updated` field (who last modified the item), or
+- the deployment's `authors` M2M list of users who have rights on the
+  deployment (junction rows exposing the user as `directus_users_id`;
+  set `DEPLOYMENT_AUTHORS_FIELD` to use a different field name, or an
+  empty value to skip this source).
+
 - Set `ENFORCE_DEPLOYMENT_OWNERSHIP=false` to disable ownership enforcement
   (not recommended for production).
 
