@@ -4,7 +4,7 @@ import { makeContainer } from '../src/lib/make-container.js'
 describe('makeContainer', () => {
   it('always sets cpu/memory limits, even without gpu', () => {
     const container = makeContainer({ name: 'app', image: 'app' }, [])
-    expect(container.resources.limits.cpu).toBe(4)
+    expect(container.resources.limits.cpu).toBe('4')
     expect(container.resources.limits.memory).toBe('32Gi')
     expect(Object.keys(container.resources.limits)).toHaveLength(2)
   })
@@ -15,7 +15,25 @@ describe('makeContainer', () => {
       []
     )
     expect(container.resources.limits['nvidia.com/gpu']).toBe(2)
-    expect(container.resources.limits.cpu).toBe(4)
+    expect(container.resources.limits.cpu).toBe('4')
+  })
+
+  it('normalizes numeric and quantity-string capacity values', () => {
+    const container = makeContainer(
+      { name: 'app', image: 'app', cpu: '1500m', memory: 2 },
+      []
+    )
+    expect(container.resources.limits.cpu).toBe('1500m')
+    expect(container.resources.limits.memory).toBe('2Gi')
+  })
+
+  it('passes quantity strings through unchanged', () => {
+    const container = makeContainer(
+      { name: 'app', image: 'app', cpu: '2', memory: '512Mi' },
+      []
+    )
+    expect(container.resources.limits.cpu).toBe('2')
+    expect(container.resources.limits.memory).toBe('512Mi')
   })
 
   it('applies runtime user and group', () => {

@@ -43,4 +43,9 @@ describe('makeVolumeClaim', () => {
     expect(claim.spec.resources.requests.storage).toBe('1Gi')
     expect(claim.spec.storageClassName).toBe('longhorn')
   })
+
+  it('normalizes numeric sizes to Gi', () => {
+    const claim = makeVolumeClaim({ name: 'mydata', size: 1 }, 'sd-5')
+    expect(claim.spec.resources.requests.storage).toBe('1Gi')
+  })
 })

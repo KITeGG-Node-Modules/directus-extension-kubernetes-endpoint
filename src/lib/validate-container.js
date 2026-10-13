@@ -1,5 +1,54 @@
 import validate from 'validate.js'
+import { NUMBER_UNITS } from './constants.js'
 import { GPU_RESOURCE_NAMES } from './gpu-profiles.js'
+import { formatQuantity, parseQuantity } from './quantity.js'
+
+const GIB = 1024 ** 3
+
+// Capacity values may be numbers (interpreted in NUMBER_UNITS) or
+// Kubernetes quantity strings ('500m', '2Gi'); both forms are
+// bounds-checked against the same policy in base units.
+function validateCpu(container, maxCores, validationErrors) {
+  if (container.cpu == null) return validationErrors
+  // Numeric cpu keeps its historical whole-cores contract; quantity
+  // strings like '1500m' express fractional cores instead
+  if (typeof container.cpu === 'number' && !Number.isInteger(container.cpu)) {
+    validationErrors.push({ cpu: ['must be a whole number of cores'] })
+    return validationErrors
+  }
+  const cores = parseQuantity(formatQuantity(container.cpu, NUMBER_UNITS.cpu))
+  if (cores == null) {
+    validationErrors.push({
+      cpu: [
+        'must be a number of cores or a Kubernetes CPU quantity (e.g. 2 or 1500m)',
+      ],
+    })
+    return validationErrors
+  }
+  if (cores < 1 || cores > maxCores) {
+    validationErrors.push({ cpu: [`must be between 1 and ${maxCores} cores`] })
+  }
+  return validationErrors
+}
+
+function validateMemory(container, maxGib, validationErrors) {
+  if (container.memory == null) return validationErrors
+  const bytes = parseQuantity(
+    formatQuantity(container.memory, NUMBER_UNITS.memory)
+  )
+  if (bytes == null) {
+    validationErrors.push({
+      memory: [
+        'must be a number of GiB or a Kubernetes memory quantity (e.g. 2Gi)',
+      ],
+    })
+    return validationErrors
+  }
+  if (bytes < GIB || bytes > maxGib * GIB) {
+    validationErrors.push({ memory: [`must be between 1 and ${maxGib} GiB`] })
+  }
+  return validationErrors
+}
 
 export function validateContainer(
   container,
@@ -41,25 +90,9 @@ export function validateContainer(
         lessThanOrEqualTo: isManagement ? 8 : 2,
       },
     },
-    cpu: {
-      type: 'integer',
-      numericality: {
-        strict: true,
-        noStrings: true,
-        onlyInteger: true,
-        greaterThanOrEqualTo: 1,
-        lessThanOrEqualTo: isManagement ? 256 : 32,
-      },
-    },
-    memory: {
-      type: 'number',
-      numericality: {
-        strict: true,
-        noStrings: true,
-        greaterThanOrEqualTo: 1,
-        lessThanOrEqualTo: isManagement ? 512 : 128,
-      },
-    },
+    // cpu/memory are validated below: they may be numbers (in NUMBER_UNITS
+    // units) or Kubernetes quantity strings, which validate.js' single-type
+    // rules cannot express
     user: {
       type: 'integer',
       numericality: {
@@ -103,6 +136,10 @@ export function validateContainer(
     validationErrors = validationErrors.concat(containerErrors)
     return validationErrors
   }
+
+  validateCpu(container, isManagement ? 256 : 32, validationErrors)
+  validateMemory(container, isManagement ? 512 : 128, validationErrors)
+  if (validationErrors.length) return validationErrors
 
   if (Array.isArray(container.ports)) {
     for (const port of container.ports) {

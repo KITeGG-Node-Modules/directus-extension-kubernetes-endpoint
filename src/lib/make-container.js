@@ -1,5 +1,6 @@
 import k8s from '@kubernetes/client-node'
-import { DEFAULT_CPU, DEFAULT_MEMORY_GI } from './constants.js'
+import { DEFAULT_CPU, DEFAULT_MEMORY_GI, NUMBER_UNITS } from './constants.js'
+import { formatQuantity } from './quantity.js'
 
 export function makeContainer(c, servicePayloads, statefulSetName) {
   const container = new k8s.V1Container()
@@ -20,10 +21,16 @@ export function makeContainer(c, servicePayloads, statefulSetName) {
 
   // Always limit cpu/memory: without limits a container runs BestEffort
   // and can exhaust worker nodes. GPU resources are added on top.
+  // Capacity values may be numbers (interpreted in NUMBER_UNITS) or
+  // Kubernetes quantity strings ('500m', '2Gi'); both are normalized here.
   container.resources = new k8s.V1ResourceRequirements()
   container.resources.limits = {
-    cpu: c.cpu || DEFAULT_CPU,
-    memory: `${c.memory || DEFAULT_MEMORY_GI}Gi`,
+    cpu:
+      formatQuantity(c.cpu || DEFAULT_CPU, NUMBER_UNITS.cpu) ??
+      `${DEFAULT_CPU}`,
+    memory:
+      formatQuantity(c.memory || DEFAULT_MEMORY_GI, NUMBER_UNITS.memory) ??
+      `${DEFAULT_MEMORY_GI}Gi`,
   }
   if (c.gpu) {
     container.resources.limits[c.gpu] = c.gpuCount || 1

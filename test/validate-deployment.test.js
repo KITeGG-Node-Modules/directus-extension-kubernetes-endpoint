@@ -68,6 +68,29 @@ describe('validateDeployment', () => {
     expect(errors).toBeUndefined()
   })
 
+  it('accepts numeric volume sizes and quantity strings', () => {
+    const errors = validateDeployment({
+      ...validDeployment,
+      volumes: [
+        { name: 'mydata', size: 50 },
+        { name: 'scratch', emptyDir: { sizeLimit: '128Mi' } },
+      ],
+    })
+    expect(errors).toBeUndefined()
+  })
+
+  it('rejects volume sizes outside 1Mi-999Gi', () => {
+    const errors = validateDeployment({
+      ...validDeployment,
+      volumes: [
+        { name: 'big', size: 1000 },
+        { name: 'weird', size: '512Ki' },
+        { name: 'huge', emptyDir: { sizeLimit: '1Gi' } },
+      ],
+    })
+    expect(errors).toHaveLength(3)
+  })
+
   it('rejects mounts without a matching volume', () => {
     const errors = validateDeployment({
       containers: [

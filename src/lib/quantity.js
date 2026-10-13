@@ -44,3 +44,26 @@ export function parseQuantity(value) {
   if (factor === undefined) return null
   return number * factor
 }
+
+const PLAIN_NUMBER_PATTERN = /^-?\d+(?:\.\d+)?$/
+
+/**
+ * Normalize a user-supplied capacity value into a Kubernetes quantity
+ * string. Numbers — and plain numeric strings, which arrive as strings
+ * from forms — are interpreted in the given default unit (see
+ * NUMBER_UNITS); strings carrying an explicit unit are passed through
+ * unchanged as long as they parse as a quantity. Unparsable input
+ * yields null.
+ */
+export function formatQuantity(value, defaultUnit = '') {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? `${value}${defaultUnit}` : null
+  }
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (trimmed === '') return null
+  if (PLAIN_NUMBER_PATTERN.test(trimmed)) {
+    return `${trimmed}${defaultUnit}`
+  }
+  return parseQuantity(trimmed) == null ? null : trimmed
+}

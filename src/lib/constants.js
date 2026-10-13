@@ -20,5 +20,16 @@ export const NODE_SELECTOR = {
 export const DEFAULT_CPU = 4
 export const DEFAULT_MEMORY_GI = 32
 
+// Units assumed for numeric (unit-less) capacity values in deploy payloads:
+// cpu: 8 is 8 cores, memory: 32 is 32Gi, volume size: 50 is 50Gi and
+// emptyDir.sizeLimit: 128 is 128Mi. Quantity strings with an explicit unit
+// ('500m', '2Gi', '512Mi') are always used as-is.
+export const NUMBER_UNITS = {
+  cpu: '', // whole cores
+  memory: 'Gi', // gibibytes
+  volumeSize: 'Gi', // gibibytes
+  emptyDirSize: 'Mi', // mebibytes
+}
+
 // Maximum replicas allowed per deployment (also enforced for ?scale=)
 export const MAX_REPLICAS = 16

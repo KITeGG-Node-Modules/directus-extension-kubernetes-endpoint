@@ -1,6 +1,17 @@
 import validate from 'validate.js'
+import { NUMBER_UNITS } from './constants.js'
 import { validateContainer } from './validate-container.js'
+import { formatQuantity, parseQuantity } from './quantity.js'
 import { isSuffixedVolumeName } from './util.js'
+
+const GIB = 1024 ** 3
+const MIB = 1024 ** 2
+const MAX_VOLUME_SIZE = 999 * GIB
+const MAX_EMPTY_DIR_SIZE = 256 * MIB
+// Volume sizes: plain numbers (and numeric strings) count as GiB, anything
+// else must be an explicit Mi or Gi quantity — larger units would silently
+// grow the requested claim
+const VOLUME_SIZE_PATTERN = /^-?\d+(?:\.\d+)?(Mi|Gi)?$/
 
 const RFC1123_PATTERN =
   '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'
@@ -100,25 +111,50 @@ export function validateDeployment(deployment, userGroups = []) {
                 'of volume must be a lowercase RFC1123 hostname (a-z,0-9,-,.)',
             },
           },
-          size: {
-            type: 'string',
-            format: {
-              pattern: '^\\d{1,3}(?:Mi|Gi){1}$',
-              message: 'must be one to three digits followed by Mi or Gi',
-            },
-          },
-          'emptyDir.sizeLimit': {
-            type: 'number',
-            numericality: {
-              strict: true,
-              noStrings: true,
-              lessThanOrEqualTo: 256,
-            },
-          },
+          // size and emptyDir.sizeLimit are validated below: they may be
+          // numbers (in NUMBER_UNITS units) or Kubernetes quantity strings,
+          // which validate.js' single-type rules cannot express
         })
         if (volumeErrors) {
           validationErrors = validationErrors.concat(volumeErrors)
           continue
+        }
+
+        // Capacity values may be numbers (interpreted in NUMBER_UNITS) or
+        // Kubernetes quantity strings; both are bounds-checked in bytes
+        if (volume.size != null) {
+          const isKnownUnit =
+            typeof volume.size === 'number' ||
+            (typeof volume.size === 'string' &&
+              VOLUME_SIZE_PATTERN.test(volume.size.trim()))
+          const bytes = parseQuantity(
+            formatQuantity(volume.size, NUMBER_UNITS.volumeSize)
+          )
+          if (
+            !isKnownUnit ||
+            bytes == null ||
+            bytes < MIB ||
+            bytes > MAX_VOLUME_SIZE
+          ) {
+            validationErrors.push({
+              volumes: [
+                `'${volume.name}' size must be between 1Mi and 999Gi (a number of Gi or an Mi/Gi quantity)`,
+              ],
+            })
+          }
+        }
+        const emptyDirSizeLimit = volume.emptyDir?.sizeLimit
+        if (emptyDirSizeLimit != null) {
+          const bytes = parseQuantity(
+            formatQuantity(emptyDirSizeLimit, NUMBER_UNITS.emptyDirSize)
+          )
+          if (bytes == null || bytes <= 0 || bytes > MAX_EMPTY_DIR_SIZE) {
+            validationErrors.push({
+              volumes: [
+                `'${volume.name}' emptyDir.sizeLimit must be a positive number of Mi or a quantity up to 256Mi`,
+              ],
+            })
+          }
         }
         // Volumes that make-stateful-set would silently drop: they need
         // to either reference an existing (suffixed) claim, become a

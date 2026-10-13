@@ -1,8 +1,13 @@
 import k8s from '@kubernetes/client-node'
 import { servicesNamespace } from './config.js'
-import { NODE_SELECTOR, RESTART_ANNOTATION_KEY } from './constants.js'
+import {
+  NODE_SELECTOR,
+  NUMBER_UNITS,
+  RESTART_ANNOTATION_KEY,
+} from './constants.js'
 import { makeVolumeClaim } from './make-volume-claim.js'
 import { makeContainer } from './make-container.js'
+import { formatQuantity } from './quantity.js'
 import { isSuffixedVolumeName } from './util.js'
 
 export function makeStatefulSet(name, deployment) {
@@ -68,7 +73,9 @@ export function makeStatefulSet(name, deployment) {
         const volume = new k8s.V1Volume()
         volume.name = v.name
         volume.emptyDir = new k8s.V1EmptyDirVolumeSource()
-        volume.emptyDir.sizeLimit = `${v.emptyDir.sizeLimit}Mi`
+        volume.emptyDir.sizeLimit =
+          formatQuantity(v.emptyDir.sizeLimit, NUMBER_UNITS.emptyDirSize) ??
+          `${v.emptyDir.sizeLimit}Mi`
         volume.emptyDir.medium = 'Memory'
         return volume
       } else if (isSuffixedVolumeName(v.name)) {

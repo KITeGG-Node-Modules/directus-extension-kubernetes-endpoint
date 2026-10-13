@@ -52,8 +52,8 @@ containers:
       - name: default
         port: 80
     # Optional fields
-    cpu: 8 # Allocate CPU cores (default is 4, maximum is 32; management: 256)
-    memory: 2 # Allocate memory in GiB (default is 32.0, maximum is 128.0; management: 512.0)
+    cpu: 8 # Allocate CPU cores (default is 4, maximum is 32; management: 256) — or a Kubernetes CPU quantity, e.g. '1500m'
+    memory: 2 # Allocate memory in GiB (default is 32.0, maximum is 128.0; management: 512.0) — or a Kubernetes memory quantity, e.g. '2Gi'
     gpu: 'nvidia.com/gpu'  # Request a GPU resource (see below for valid options)
     command: '/bin/echo', # Override the container's command
     args: ['asdf', 'hello'], # Supply arguments to the container's command
@@ -64,10 +64,10 @@ containers:
     user: 1000
     group: 1000
     # Change filesystem ownership, overriding defaults
-    fsUser: 1000 
+    fsUser: 1000
     fsGroup: 1000
     changeGroupOnMismatch: true # Optional
-    
+
     # Volume mounts are optional as you can also deploy without persistence
     volumeMounts:
       - name: mydata
@@ -79,8 +79,13 @@ containers:
 # The volumes section is only mandatory if mounts are specified (name has to match)
 volumes:
   - name: mydata
-    size: 1Gi  # This can be anything between 1-999 Gi or Mi
+    size: 1Gi  # This can be anything between 1-999 Gi or Mi (a plain number is Gi)
 ```
+
+Capacity values (`cpu`, `memory` and volume `size`/`emptyDir.sizeLimit`) can be supplied either as plain numbers —
+interpreted as cores (CPU), GiB (`memory` and volume `size`) or MiB (`emptyDir.sizeLimit`) — or as Kubernetes
+quantity strings with an explicit unit (e.g. `cpu: '1500m'`, `memory: '512Mi'`, `size: '128Mi'`). The same
+validation limits apply regardless of the form used.
 
 These are the possible values for `gpu`:
 
@@ -284,7 +289,7 @@ timestamps=true               # Adds timestamps to the log lines
 
 To request events regarding the status of the deployment, poll this endpoint path:
 
-``` 
+```
 GET /kubernetes/deployments/<deployment ID>/events/<pod name>
 ```
 
@@ -294,12 +299,12 @@ An example output:
 
 ```json
 [
-    {
-        "creationTimestamp": "2024-04-17T09:05:33.000Z",
-        "note": "0/8 nodes are available: 3 node(s) didn't match Pod's node affinity/selector, 5 Insufficient nvidia/gpu. preemption: 0/8 nodes are available: 3 Preemption is not helpful for scheduling, 5 No preemption victims found for incoming pod.",
-        "reason": "FailedScheduling",
-        "type": "Warning"
-    }
+  {
+    "creationTimestamp": "2024-04-17T09:05:33.000Z",
+    "note": "0/8 nodes are available: 3 node(s) didn't match Pod's node affinity/selector, 5 Insufficient nvidia/gpu. preemption: 0/8 nodes are available: 3 Preemption is not helpful for scheduling, 5 No preemption victims found for incoming pod.",
+    "reason": "FailedScheduling",
+    "type": "Warning"
+  }
 ]
 ```
 

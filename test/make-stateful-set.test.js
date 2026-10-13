@@ -70,6 +70,15 @@ describe('makeStatefulSet', () => {
     expect(statefulSet.spec.volumeClaimTemplates).toHaveLength(0)
   })
 
+  it('accepts quantity strings for emptyDir size limits', () => {
+    const { statefulSet } = makeStatefulSet('sd-5', {
+      containers: deployment.containers,
+      volumes: [{ name: 'scratch', emptyDir: { sizeLimit: '128Mi' } }],
+    })
+    const [emptyDir] = statefulSet.spec.template.spec.volumes
+    expect(emptyDir.emptyDir.sizeLimit).toBe('128Mi')
+  })
+
   it('does not create services for init containers', () => {
     const { servicePayloads } = makeStatefulSet('sd-5', {
       containers: deployment.containers,

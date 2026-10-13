@@ -1,6 +1,7 @@
 import k8s from '@kubernetes/client-node'
 import { storageClassName } from './config.js'
-import { APP_LABEL_KEY } from './constants.js'
+import { APP_LABEL_KEY, NUMBER_UNITS } from './constants.js'
+import { formatQuantity } from './quantity.js'
 
 export function makeVolumeClaim(volume, statefulSetName) {
   const volumeClaim = new k8s.V1PersistentVolumeClaim()
@@ -16,7 +17,8 @@ export function makeVolumeClaim(volume, statefulSetName) {
   volumeClaim.spec.accessModes = [volume.type || 'ReadWriteOnce']
   volumeClaim.spec.resources = new k8s.V1ResourceRequirements()
   volumeClaim.spec.resources.requests = {
-    storage: volume.size,
+    storage:
+      formatQuantity(volume.size, NUMBER_UNITS.volumeSize) ?? volume.size,
   }
   return volumeClaim
 }
