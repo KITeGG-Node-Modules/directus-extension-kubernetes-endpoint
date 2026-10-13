@@ -23,7 +23,7 @@ export default {
       baseRequestHandler(getDeployment, context)
     )
 
-    router.get(
+    router.post(
       '/deployments/:id/hooks/restart',
       baseRequestHandler(restartDeployment, context)
     )

@@ -52,8 +52,8 @@ containers:
       - name: default
         port: 80
     # Optional fields
-    cpu: 8 # Allocate CPU cores (default is 4, maximum 32)
-    memory: 0.5 # Allocate memory (in Gb, default is 16.0, maximum is 64.0)
+    cpu: 8 # Allocate CPU cores (default is 4, maximum is 32; management: 256)
+    memory: 2 # Allocate memory in GiB (default is 32.0, maximum is 128.0; management: 512.0)
     gpu: 'nvidia.com/gpu'  # Request a GPU resource (see below for valid options)
     command: '/bin/echo', # Override the container's command
     args: ['asdf', 'hello'], # Supply arguments to the container's command
@@ -236,7 +236,7 @@ containers:
 To restart the deployment, you can access this hook:
 
 ```
-GET /kubernetes/deployments/<service ID>/hooks/restart
+POST /kubernetes/deployments/<service ID>/hooks/restart
 ```
 
 ### Scaling (stopping) a deployment
@@ -246,6 +246,9 @@ To change the scale of a deployment at runtime, call this endpoint:
 ```
 PATCH /kubernetes/deployments/<service ID>?scale=<0-16>
 ```
+
+The scale must be an integer between 0 and 16; other values are rejected with a
+400 response.
 
 Note: Using `0` is equivalent to stopping the deployment without removing resources.
 

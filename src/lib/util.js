@@ -2,6 +2,9 @@ import slugify from 'slugify'
 import { parse } from 'yaml'
 import { MAX_REPLICAS } from './constants.js'
 
+const VOLUME_SUFFIX_PATTERN =
+  /^.*-sd-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[0-9]+$/
+
 export function getNameSlug(name) {
   return slugify(name, {
     replacement: '-',
@@ -85,8 +88,7 @@ export function handleErrorResponse(res, err) {
 }
 
 export function isSuffixedVolumeName(name) {
-  const regex = new RegExp(
-    '^.*-sd-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[0-9]+$'
-  )
-  return regex.test(name)
+  // Names of existing volume claims restored for a deployment:
+  // <name>-sd-<uuid>-<ordinal>
+  return VOLUME_SUFFIX_PATTERN.test(name)
 }
