@@ -1,5 +1,6 @@
 import slugify from 'slugify'
 import { parse } from 'yaml'
+import { MAX_REPLICAS } from './constants.js'
 
 export function getNameSlug(name) {
   return slugify(name, {
@@ -28,6 +29,17 @@ export function parseDeploymentData(deployment) {
     error.extensions = { code: 'INVALID_PAYLOAD' }
     throw error
   }
+}
+
+/**
+ * Parse a ?scale= query value, returning an integer within the allowed
+ * replica bounds, or null when the value is not a valid scale.
+ */
+export function parseScale(value) {
+  if (!/^\d+$/.test(String(value ?? ''))) return null
+  const scale = parseInt(value, 10)
+  if (scale < 0 || scale > MAX_REPLICAS) return null
+  return scale
 }
 
 const DIRECTUS_ERROR_KEYS = {

@@ -16,6 +16,7 @@ import {
   getDeploymentName,
   handleErrorResponse,
   parseDeploymentData,
+  parseScale,
 } from './lib/util.js'
 import { createService } from './create-service.js'
 import k8s from '@kubernetes/client-node'
@@ -258,6 +259,12 @@ export default {
           const statefulSetName = getDeploymentName(user, deployment.id)
           const client = getKubernetesClient(servicesNamespace, k8s.AppsV1Api)
           if (typeof scale !== 'undefined') {
+            // ?scale= must be an integer within the replica bounds
+            const replicas = parseScale(scale)
+            if (replicas === null) {
+              res.status(400)
+              return { message: 'api_errors.bad_request' }
+            }
             const { body: existing } = await client.listNamespacedStatefulSet(
               servicesNamespace,
               undefined,
@@ -271,7 +278,7 @@ export default {
                   op: 'replace',
                   path: '/spec',
                   value: {
-                    replicas: parseInt(scale),
+                    replicas,
                   },
                 },
               ]
