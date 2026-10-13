@@ -1,5 +1,6 @@
 import { getWorkers } from './get-workers.js'
 import { resourceToGpuProfile } from './lib/gpu-profiles.js'
+import { parseQuantity } from './lib/quantity.js'
 
 export async function getClusterCapacity() {
   const workers = await getWorkers()
@@ -9,7 +10,9 @@ export async function getClusterCapacity() {
     result.available = {}
     for (const key in worker.allocatable) {
       if (key.startsWith('nvidia')) {
-        result.available[resourceToGpuProfile(key)] = worker.allocatable[key]
+        result.available[resourceToGpuProfile(key)] = parseQuantity(
+          worker.allocatable[key]
+        )
       }
     }
     result.requested = {}
