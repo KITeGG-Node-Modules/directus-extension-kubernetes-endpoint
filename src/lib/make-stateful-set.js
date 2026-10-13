@@ -94,7 +94,7 @@ export function makeStatefulSet(name, deployment) {
       if (isSuffixedVolumeName(v.name)) {
         return null
       } else if (v.size) {
-        return makeVolumeClaim(v)
+        return makeVolumeClaim(v, name)
       }
       return null
     })

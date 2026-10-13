@@ -7,3 +7,6 @@ export const deploymentOwnerField =
 // Set ENFORCE_DEPLOYMENT_OWNERSHIP=false to disable deployment ownership checks
 export const enforceDeploymentOwnership =
   process.env.ENFORCE_DEPLOYMENT_OWNERSHIP !== 'false'
+
+// Storage class for volume claim templates
+export const storageClassName = process.env.SERVICES_STORAGE_CLASS || 'longhorn'
