@@ -22,6 +22,7 @@ import { makeConfigMap } from './lib/make-config-map.js'
 import { createConfigMap } from './create-config-map.js'
 import { checkReservation } from './lib/check-reservation.js'
 import { getOwnedPod } from './lib/get-owned-pod.js'
+import { isDeploymentOwner } from './lib/resolve-deployment.js'
 
 export default {
   id: 'kubernetes',
@@ -67,6 +68,10 @@ export default {
         if (!deployment) {
           res.status(404)
           return { message: 'api_errors.not_found' }
+        }
+        if (!isDeploymentOwner(req, user, deployment)) {
+          res.status(403)
+          return { message: 'api_errors.forbidden' }
         }
         try {
           const isValid = await checkReservation(req, services, deployment)
@@ -218,6 +223,10 @@ export default {
           res.status(404)
           return { message: 'api_errors.not_found' }
         }
+        if (!isDeploymentOwner(req, user, deployment)) {
+          res.status(403)
+          return { message: 'api_errors.forbidden' }
+        }
         try {
           const isValid = await checkReservation(req, services, deployment)
           if (!isValid) {
@@ -288,6 +297,10 @@ export default {
           res.status(404)
           return { message: 'api_errors.not_found' }
         }
+        if (!isDeploymentOwner(req, user, deployment)) {
+          res.status(403)
+          return { message: 'api_errors.forbidden' }
+        }
         try {
           await deleteDeployment(user, deployment)
           return { deleted: deployment.id }
@@ -315,6 +328,10 @@ export default {
         if (!deployment) {
           res.status(404)
           return { message: 'api_errors.not_found' }
+        }
+        if (!isDeploymentOwner(req, user, deployment)) {
+          res.status(403)
+          return { message: 'api_errors.forbidden' }
         }
         try {
           const isValid = await checkReservation(req, services, deployment)
@@ -350,6 +367,10 @@ export default {
         if (!deployment) {
           res.status(404)
           return { message: 'api_errors.not_found' }
+        }
+        if (!isDeploymentOwner(req, user, deployment)) {
+          res.status(403)
+          return { message: 'api_errors.forbidden' }
         }
         const isValid = await checkReservation(req, services, deployment)
         if (!isValid) {
@@ -419,6 +440,10 @@ export default {
         if (!deployment) {
           res.status(404)
           return { message: 'api_errors.not_found' }
+        }
+        if (!isDeploymentOwner(req, user, deployment)) {
+          res.status(403)
+          return { message: 'api_errors.forbidden' }
         }
         const statefulSetName = getDeploymentName(user, deployment.id)
         let secretData = {}
@@ -495,6 +520,10 @@ export default {
         if (!deployment) {
           res.status(404)
           return { message: 'api_errors.not_found' }
+        }
+        if (!isDeploymentOwner(req, user, deployment)) {
+          res.status(403)
+          return { message: 'api_errors.forbidden' }
         }
         const statefulSetName = getDeploymentName(user, deployment.id)
         let configMapData = {}

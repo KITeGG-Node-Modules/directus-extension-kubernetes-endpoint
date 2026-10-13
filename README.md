@@ -8,6 +8,22 @@
 
 First, the service needs to be created in the collection `deployments` in the LLP API.
 
+### Authorization
+
+Mutating endpoints (deploying, restarting, scaling, deleting, secrets and
+configs) verify that the requesting user owns the deployment before
+performing any operation; admins always have access. Requests from other
+users are rejected with `403`.
+
+- The owner is read from the deployment's `user` field by default. Set
+  `DEPLOYMENT_OWNER_FIELD` to use a different field name.
+- Set `ENFORCE_DEPLOYMENT_OWNERSHIP=false` to disable ownership enforcement
+  (not recommended for production).
+
+Pod-scoped endpoints (logs, events, pod deletion) additionally verify that
+the requested pod actually belongs to the deployment; requests for foreign
+or non-existent pods return `404`.
+
 The required payload for the service is:
 
 ```json
