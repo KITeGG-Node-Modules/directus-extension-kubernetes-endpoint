@@ -39,7 +39,7 @@ export function makeStatefulSet(name, deployment) {
   podSpec.restartPolicy = deployment.restartPolicy || 'Always'
   podSpec.enableServiceLinks = false
 
-  function parseContainers(containers) {
+  function parseContainers(containers, payloads) {
     return containers.map((c) => {
       // Pod-level filesystem ownership: must be a V1PodSecurityContext
       // (V1SecurityContext does not carry fsUser/fsGroup and would
@@ -55,13 +55,14 @@ export function makeStatefulSet(name, deployment) {
       if (c.changeGroupOnMismatch) {
         podSpec.securityContext.fsGroupChangePolicy = 'OnRootMismatch'
       }
-      return makeContainer(c, servicePayloads, name)
+      return makeContainer(c, payloads, name)
     })
   }
 
-  podSpec.containers = parseContainers(deployment.containers)
+  podSpec.containers = parseContainers(deployment.containers, servicePayloads)
   if (deployment.initContainers) {
-    podSpec.initContainers = parseContainers(deployment.initContainers)
+    // Init containers are transient: they must not create services
+    podSpec.initContainers = parseContainers(deployment.initContainers, null)
   }
 
   podSpec.volumes = (deployment.volumes || [])

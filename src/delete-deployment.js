@@ -51,8 +51,8 @@ async function deleteLabeledResources(
   }
 }
 
-export async function deleteDeployment(user, deployment) {
-  const statefulSetName = getDeploymentName(user, deployment.id)
+export async function deleteDeployment(deployment) {
+  const statefulSetName = getDeploymentName(deployment.id)
   const appsClient = getKubernetesClient(servicesNamespace, k8s.AppsV1Api)
   const coreClient = getKubernetesClient(servicesNamespace)
   const labelSelector = `${APP_LABEL_KEY}=${statefulSetName}`

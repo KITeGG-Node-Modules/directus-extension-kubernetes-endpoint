@@ -11,7 +11,7 @@ export function getNameSlug(name) {
   })
 }
 
-export function getDeploymentName(user, name) {
+export function getDeploymentName(name) {
   const nameSlug = getNameSlug(name)
   return `sd-${nameSlug}`
 }

@@ -1,636 +1,75 @@
-import {
-  baseRequestHandler,
-  getKubernetesClient,
-} from 'kitegg-directus-extension-common'
-import { parse } from 'yaml'
-import { servicesNamespace } from './lib/config.js'
-import { validateDeployment } from './lib/validate-deployment.js'
-import { makeStatefulSet } from './lib/make-stateful-set.js'
-import { makeService } from './lib/make-service.js'
-import { getClusterCapacity } from './get-cluster-capacity.js'
-import { getDeploymentInfo } from './get-deployment-info.js'
-import { getPodEvents } from './get-pod-events.js'
-import { deleteDeployment } from './delete-deployment.js'
-import { createStatefulSet } from './create-stateful-set.js'
-import {
-  getDeploymentName,
-  handleErrorResponse,
-  parseDeploymentData,
-  parseScale,
-} from './lib/util.js'
-import { createService } from './create-service.js'
-import k8s from '@kubernetes/client-node'
-import { RESTART_ANNOTATION_KEY } from './lib/constants.js'
-import { makeSecret } from './lib/make-secret.js'
-import { createSecret } from './create-secret.js'
-import { makeConfigMap } from './lib/make-config-map.js'
-import { createConfigMap } from './create-config-map.js'
-import { checkReservation } from './lib/check-reservation.js'
-import { getOwnedPod } from './lib/get-owned-pod.js'
-import { isDeploymentOwner } from './lib/resolve-deployment.js'
+import { baseRequestHandler } from 'kitegg-directus-extension-common'
+import { getCapacity } from './endpoints/capacity.js'
+import { getDeployment } from './endpoints/get-deployment.js'
+import { restartDeployment } from './endpoints/restart-deployment.js'
+import { getPodLogs } from './endpoints/get-pod-logs.js'
+import { getDeploymentPodEvents } from './endpoints/get-pod-events.js'
+import { scaleDeployment } from './endpoints/scale-deployment.js'
+import { deleteDeploymentRoute } from './endpoints/delete-deployment.js'
+import { deleteDeploymentPod } from './endpoints/delete-pod.js'
+import { deployDeployment } from './endpoints/deploy-deployment.js'
+import { putDeploymentSecret } from './endpoints/put-secret.js'
+import { getDeploymentSecret } from './endpoints/get-secret.js'
+import { putDeploymentConfig } from './endpoints/put-config.js'
+import { getDeploymentConfig } from './endpoints/get-config.js'
 
 export default {
   id: 'kubernetes',
   handler: (router, context) => {
-    router.get(
-      '/capacity',
-      baseRequestHandler(async ({ res }) => {
-        try {
-          return await getClusterCapacity()
-        } catch (err) {
-          return handleErrorResponse(res, err)
-        }
-      }, context)
-    )
+    router.get('/capacity', baseRequestHandler(getCapacity, context))
 
     router.get(
       '/deployments/:id',
-      baseRequestHandler(async (ctx) => {
-        const { req, res, user, services } = ctx
-        const { ItemsService } = services
-        const deploymentsService = new ItemsService('deployments', {
-          schema: req.schema,
-          accountability: req.accountability,
-        })
-        const deployment = await deploymentsService.readOne(req.params.id)
-        if (!deployment) {
-          res.status(404)
-          return { message: 'api_errors.not_found' }
-        }
-        try {
-          const results = await getDeploymentInfo(user, deployment)
-          return results
-        } catch (err) {
-          return handleErrorResponse(res, err)
-        }
-      }, context)
+      baseRequestHandler(getDeployment, context)
     )
 
     router.get(
       '/deployments/:id/hooks/restart',
-      baseRequestHandler(async (ctx) => {
-        const { req, res, user, services } = ctx
-        const { ItemsService } = services
-        const deploymentsService = new ItemsService('deployments', {
-          schema: req.schema,
-          accountability: req.accountability,
-        })
-        const deployment = await deploymentsService.readOne(req.params.id)
-        if (!deployment) {
-          res.status(404)
-          return { message: 'api_errors.not_found' }
-        }
-        if (!isDeploymentOwner(req, user, deployment)) {
-          res.status(403)
-          return { message: 'api_errors.forbidden' }
-        }
-        try {
-          const deploymentData = parseDeploymentData(deployment)
-          const isValid = await checkReservation(
-            req,
-            services,
-            deployment,
-            deploymentData
-          )
-          if (!isValid) {
-            res.status(400)
-            return { message: 'api_errors.not_enough_resources' }
-          }
-          const statefulSetName = getDeploymentName(user, deployment.id)
-          const client = getKubernetesClient(servicesNamespace, k8s.AppsV1Api)
-          const { body: existing } = await client.listNamespacedStatefulSet(
-            servicesNamespace,
-            undefined,
-            undefined,
-            undefined,
-            `metadata.name=${statefulSetName}`
-          )
-          if (existing.items.length === 1) {
-            const patch = [
-              {
-                op: 'replace',
-                path: '/spec/template/metadata/annotations',
-                value: {
-                  [RESTART_ANNOTATION_KEY]: new Date().toISOString(),
-                },
-              },
-            ]
-            const options = {
-              headers: {
-                'Content-type': k8s.PatchUtils.PATCH_FORMAT_JSON_PATCH,
-              },
-            }
-            await client.patchNamespacedStatefulSet(
-              statefulSetName,
-              servicesNamespace,
-              patch,
-              undefined,
-              undefined,
-              undefined,
-              undefined,
-              undefined,
-              options
-            )
-            return { success: true }
-          }
-          res.status(404)
-          return { message: 'api_errors.not_found' }
-        } catch (err) {
-          return handleErrorResponse(res, err)
-        }
-      }, context)
+      baseRequestHandler(restartDeployment, context)
     )
 
     router.get(
       '/deployments/:id/logs/:podName',
-      baseRequestHandler(async (ctx) => {
-        const { req, res, user, services } = ctx
-        const { podName } = req.params
-        if (!podName) {
-          res.status(400)
-          return { message: 'api_errors.pod_name_missing' }
-        }
-        const { ItemsService } = services
-        const deploymentsService = new ItemsService('deployments', {
-          schema: req.schema,
-          accountability: req.accountability,
-        })
-        const deployment = await deploymentsService.readOne(req.params.id)
-        if (!deployment) {
-          res.status(404)
-          return { message: 'api_errors.not_found' }
-        }
-        try {
-          const statefulSetName = getDeploymentName(user, deployment.id)
-          const pod = await getOwnedPod(statefulSetName, podName)
-          if (!pod) {
-            res.status(404)
-            return { message: 'api_errors.not_found' }
-          }
-          const coreClient = getKubernetesClient(servicesNamespace)
-          const sinceSeconds = req.query.sinceSeconds
-            ? parseInt(req.query.sinceSeconds)
-            : undefined
-          const { body } = await coreClient.readNamespacedPodLog(
-            podName,
-            servicesNamespace,
-            req.query.container,
-            false,
-            undefined,
-            undefined,
-            undefined,
-            !!req.query.previous,
-            sinceSeconds,
-            undefined,
-            !!req.query.timestamps
-          )
-          res.setHeader('content-type', 'text/plain')
-          return body || ''
-        } catch (err) {
-          return handleErrorResponse(res, err)
-        }
-      }, context)
+      baseRequestHandler(getPodLogs, context)
     )
 
     router.get(
       '/deployments/:id/events/:podName',
-      baseRequestHandler(async (ctx) => {
-        const { req, res, user, services } = ctx
-        const { podName } = req.params
-        if (!podName) {
-          res.status(400)
-          return { message: 'api_errors.pod_name_missing' }
-        }
-        const { ItemsService } = services
-        const deploymentsService = new ItemsService('deployments', {
-          schema: req.schema,
-          accountability: req.accountability,
-        })
-        const deployment = await deploymentsService.readOne(req.params.id)
-        if (!deployment) {
-          res.status(404)
-          return { message: 'api_errors.not_found' }
-        }
-        try {
-          const statefulSetName = getDeploymentName(user, deployment.id)
-          const pod = await getOwnedPod(statefulSetName, podName)
-          if (!pod) {
-            res.status(404)
-            return { message: 'api_errors.not_found' }
-          }
-          return await getPodEvents(podName)
-        } catch (err) {
-          return handleErrorResponse(res, err)
-        }
-      }, context)
+      baseRequestHandler(getDeploymentPodEvents, context)
     )
 
-    router.patch(
-      '/deployments/:id',
-      baseRequestHandler(async (ctx) => {
-        const { req, res, services, user } = ctx
-        const { scale } = req.query
-        const { ItemsService } = services
-        const deploymentsService = new ItemsService('deployments', {
-          schema: req.schema,
-          accountability: req.accountability,
-        })
-        const deployment = await deploymentsService.readOne(req.params.id)
-        if (!deployment) {
-          res.status(404)
-          return { message: 'api_errors.not_found' }
-        }
-        if (!isDeploymentOwner(req, user, deployment)) {
-          res.status(403)
-          return { message: 'api_errors.forbidden' }
-        }
-        try {
-          const deploymentData = parseDeploymentData(deployment)
-          const isValid = await checkReservation(
-            req,
-            services,
-            deployment,
-            deploymentData
-          )
-          if (!isValid) {
-            res.status(400)
-            return { message: 'api_errors.not_enough_resources' }
-          }
-          const statefulSetName = getDeploymentName(user, deployment.id)
-          const client = getKubernetesClient(servicesNamespace, k8s.AppsV1Api)
-          if (typeof scale !== 'undefined') {
-            // ?scale= must be an integer within the replica bounds
-            const replicas = parseScale(scale)
-            if (replicas === null) {
-              res.status(400)
-              return { message: 'api_errors.bad_request' }
-            }
-            const { body: existing } = await client.listNamespacedStatefulSet(
-              servicesNamespace,
-              undefined,
-              undefined,
-              undefined,
-              `metadata.name=${statefulSetName}`
-            )
-            if (existing.items.length === 1) {
-              const patch = [
-                {
-                  op: 'replace',
-                  path: '/spec',
-                  value: {
-                    replicas,
-                  },
-                },
-              ]
-              const options = {
-                headers: {
-                  'Content-type': k8s.PatchUtils.PATCH_FORMAT_JSON_PATCH,
-                },
-              }
-              await client.patchNamespacedStatefulSetScale(
-                statefulSetName,
-                servicesNamespace,
-                patch,
-                undefined,
-                undefined,
-                undefined,
-                undefined,
-                undefined,
-                options
-              )
-              return { success: true }
-            } else {
-              res.status(404)
-              return { message: 'api_errors.not_found' }
-            }
-          }
-          res.status(400)
-          return { message: 'api_errors.bad_request' }
-        } catch (err) {
-          return handleErrorResponse(res, err)
-        }
-      }, context)
-    )
+    router.patch('/deployments/:id', baseRequestHandler(scaleDeployment, context))
 
     router.delete(
       '/deployments/:id',
-      baseRequestHandler(async (ctx) => {
-        const { req, res, user, services } = ctx
-        const { ItemsService } = services
-        const deploymentsService = new ItemsService('deployments', {
-          schema: req.schema,
-          accountability: req.accountability,
-        })
-        const deployment = await deploymentsService.readOne(req.params.id)
-        if (!deployment) {
-          res.status(404)
-          return { message: 'api_errors.not_found' }
-        }
-        if (!isDeploymentOwner(req, user, deployment)) {
-          res.status(403)
-          return { message: 'api_errors.forbidden' }
-        }
-        try {
-          await deleteDeployment(user, deployment)
-          return { deleted: deployment.id }
-        } catch (err) {
-          return handleErrorResponse(res, err)
-        }
-      }, context)
+      baseRequestHandler(deleteDeploymentRoute, context)
     )
 
     router.delete(
       '/deployments/:id/pods/:podName',
-      baseRequestHandler(async (ctx) => {
-        const { req, res, user, services } = ctx
-        const { podName } = req.params
-        if (!podName) {
-          res.status(400)
-          return { message: 'api_errors.pod_name_missing' }
-        }
-        const { ItemsService } = services
-        const deploymentsService = new ItemsService('deployments', {
-          schema: req.schema,
-          accountability: req.accountability,
-        })
-        const deployment = await deploymentsService.readOne(req.params.id)
-        if (!deployment) {
-          res.status(404)
-          return { message: 'api_errors.not_found' }
-        }
-        if (!isDeploymentOwner(req, user, deployment)) {
-          res.status(403)
-          return { message: 'api_errors.forbidden' }
-        }
-        try {
-          const deploymentData = parseDeploymentData(deployment)
-          const isValid = await checkReservation(
-            req,
-            services,
-            deployment,
-            deploymentData
-          )
-          if (!isValid) {
-            res.status(400)
-            return { message: 'api_errors.not_enough_resources' }
-          }
-          const statefulSetName = getDeploymentName(user, deployment.id)
-          const pod = await getOwnedPod(statefulSetName, podName)
-          if (!pod) {
-            res.status(404)
-            return { message: 'api_errors.not_found' }
-          }
-          const coreClient = getKubernetesClient(servicesNamespace)
-          await coreClient.deleteNamespacedPod(podName, servicesNamespace)
-          return { deleted: podName }
-        } catch (err) {
-          return handleErrorResponse(res, err)
-        }
-      }, context)
+      baseRequestHandler(deleteDeploymentPod, context)
     )
 
-    router.put(
-      '/deployments/:id',
-      baseRequestHandler(async (ctx) => {
-        const { req, res, user, userGroups, services } = ctx
-        const { ItemsService } = services
-        const deploymentsService = new ItemsService('deployments', {
-          schema: req.schema,
-          accountability: req.accountability,
-        })
-        const deployment = await deploymentsService.readOne(req.params.id)
-        if (!deployment) {
-          res.status(404)
-          return { message: 'api_errors.not_found' }
-        }
-        if (!isDeploymentOwner(req, user, deployment)) {
-          res.status(403)
-          return { message: 'api_errors.forbidden' }
-        }
-        const statefulSetName = getDeploymentName(user, deployment.id)
-        let deploymentData
-        try {
-          deploymentData = parseDeploymentData(deployment)
-        } catch (err) {
-          return handleErrorResponse(res, err)
-        }
-        if (!deploymentData) {
-          res.status(400)
-          return { message: 'api_errors.bad_request' }
-        }
-        const isValid = await checkReservation(
-          req,
-          services,
-          deployment,
-          deploymentData
-        )
-        if (!isValid) {
-          res.status(400)
-          return { message: 'api_errors.not_enough_resources' }
-        }
-        const validationErrors = validateDeployment(deploymentData, userGroups)
-        if (validationErrors) {
-          res.status(400)
-          return validationErrors
-        }
-        const { statefulSet, servicePayloads } = makeStatefulSet(
-          statefulSetName,
-          deploymentData
-        )
-        let created = false
-        try {
-          const statefulSetResult = await createStatefulSet(
-            statefulSet,
-            statefulSetName
-          )
-          created = statefulSetResult.created
-        } catch (err) {
-          return handleErrorResponse(res, err)
-        }
-
-        for (const payload of servicePayloads) {
-          const serviceName = `${statefulSetName}-${payload.name}`
-          const service = makeService(
-            statefulSetName,
-            serviceName,
-            payload.ports
-          )
-          try {
-            const serviceResult = await createService(service, serviceName)
-            created = created || serviceResult.created
-          } catch (err) {
-            return handleErrorResponse(res, err)
-          }
-        }
-
-        if (created) res.status(201)
-        return deploymentData
-      }, context)
-    )
+    router.put('/deployments/:id', baseRequestHandler(deployDeployment, context))
 
     router.put(
       '/deployments/:id/secret',
-      baseRequestHandler(async (ctx) => {
-        const { req, res, user, services } = ctx
-        const { ItemsService } = services
-        const deploymentsService = new ItemsService('deployments', {
-          schema: req.schema,
-          accountability: req.accountability,
-        })
-        const deployment = await deploymentsService.readOne(req.params.id)
-        if (!deployment) {
-          res.status(404)
-          return { message: 'api_errors.not_found' }
-        }
-        if (!isDeploymentOwner(req, user, deployment)) {
-          res.status(403)
-          return { message: 'api_errors.forbidden' }
-        }
-        const statefulSetName = getDeploymentName(user, deployment.id)
-        let secretData = {}
-        try {
-          if (typeof req.body?.data === 'string') {
-            secretData = parse(req.body?.data)
-          } else {
-            secretData = req.body?.data
-          }
-          for (const key in secretData) {
-            if (typeof secretData[key] !== 'string') {
-              secretData[key] = secretData[key].toString()
-            }
-          }
-        } catch (err) {
-          res.status(400)
-          return {
-            errors: [{ data: err.message }],
-          }
-        }
-        const secret = makeSecret(statefulSetName, secretData)
-        try {
-          const { created } = await createSecret(secret, statefulSetName)
-          if (created) res.status(201)
-        } catch (err) {
-          return handleErrorResponse(res, err)
-        }
-        return secretData
-      }, context)
+      baseRequestHandler(putDeploymentSecret, context)
     )
 
     router.get(
       '/deployments/:id/secret',
-      baseRequestHandler(async (ctx) => {
-        const { req, res, services, user } = ctx
-        const { ItemsService } = services
-        const deploymentsService = new ItemsService('deployments', {
-          schema: req.schema,
-          accountability: req.accountability,
-        })
-        const deployment = await deploymentsService.readOne(req.params.id)
-        if (!deployment) {
-          res.status(404)
-          return { message: 'api_errors.not_found' }
-        }
-        try {
-          const statefulSetName = getDeploymentName(user, deployment.id)
-          const coreClient = getKubernetesClient(servicesNamespace)
-          const secret = await coreClient.readNamespacedSecret(
-            statefulSetName,
-            servicesNamespace
-          )
-          const secretData = secret.body.data
-          for (const key in secretData) {
-            const buffer = Buffer.from(secretData[key], 'base64')
-            secretData[key] = buffer.toString()
-          }
-          return { data: secretData }
-        } catch (err) {
-          return handleErrorResponse(res, err)
-        }
-      }, context)
+      baseRequestHandler(getDeploymentSecret, context)
     )
 
     router.put(
       '/deployments/:id/config',
-      baseRequestHandler(async (ctx) => {
-        const { req, res, user, services } = ctx
-        const { ItemsService } = services
-        const deploymentsService = new ItemsService('deployments', {
-          schema: req.schema,
-          accountability: req.accountability,
-        })
-        const deployment = await deploymentsService.readOne(req.params.id)
-        if (!deployment) {
-          res.status(404)
-          return { message: 'api_errors.not_found' }
-        }
-        if (!isDeploymentOwner(req, user, deployment)) {
-          res.status(403)
-          return { message: 'api_errors.forbidden' }
-        }
-        const statefulSetName = getDeploymentName(user, deployment.id)
-        let configMapData = {}
-        try {
-          if (typeof req.body?.data === 'string') {
-            configMapData = parse(req.body?.data)
-          } else {
-            configMapData = req.body?.data
-          }
-          for (const key in configMapData) {
-            if (typeof configMapData[key] !== 'string') {
-              configMapData[key] = configMapData[key].toString()
-            }
-          }
-        } catch (err) {
-          res.status(400)
-          return {
-            errors: [{ data: err.message }],
-          }
-        }
-        if (Object.keys(configMapData).length) {
-          const configMap = makeConfigMap(statefulSetName, configMapData)
-          try {
-            const { created } = await createConfigMap(
-              configMap,
-              statefulSetName
-            )
-            if (created) res.status(201)
-          } catch (err) {
-            return handleErrorResponse(res, err)
-          }
-
-          return configMapData
-        }
-        res.status(400)
-        return { message: 'api_errors.bad_request' }
-      }, context)
+      baseRequestHandler(putDeploymentConfig, context)
     )
 
     router.get(
       '/deployments/:id/config',
-      baseRequestHandler(async (ctx) => {
-        const { req, res, services, user } = ctx
-        const { ItemsService } = services
-        const deploymentsService = new ItemsService('deployments', {
-          schema: req.schema,
-          accountability: req.accountability,
-        })
-        const deployment = await deploymentsService.readOne(req.params.id)
-        if (!deployment) {
-          res.status(404)
-          return { message: 'api_errors.not_found' }
-        }
-        try {
-          const statefulSetName = getDeploymentName(user, deployment.id)
-          const coreClient = getKubernetesClient(servicesNamespace)
-          const configMap = await coreClient.readNamespacedConfigMap(
-            statefulSetName,
-            servicesNamespace
-          )
-          return { data: configMap.body.data }
-        } catch (err) {
-          return handleErrorResponse(res, err)
-        }
-      }, context)
+      baseRequestHandler(getDeploymentConfig, context)
     )
   },
 }

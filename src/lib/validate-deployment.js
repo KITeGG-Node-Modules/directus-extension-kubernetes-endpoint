@@ -1,6 +1,9 @@
 import validate from 'validate.js'
 import { validateContainer } from './validate-container.js'
-import { GPU_RESOURCE_NAMES } from './gpu-profiles.js'
+import { isSuffixedVolumeName } from './util.js'
+
+const RFC1123_PATTERN =
+  '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'
 
 export function validateDeployment(deployment, userGroups = []) {
   let validationErrors = []
@@ -33,6 +36,11 @@ export function validateDeployment(deployment, userGroups = []) {
   if (topLevelErrors) {
     validationErrors = validationErrors.concat(topLevelErrors)
     return validationErrors
+  }
+
+  // validate.js' presence check passes for empty arrays
+  if (deployment.containers.length === 0) {
+    return [{ containers: ["can't be blank"] }]
   }
 
   // Pod-level filesystem ownership can only be set once; containers
@@ -77,22 +85,17 @@ export function validateDeployment(deployment, userGroups = []) {
   }
 
   if (deployment.volumes) {
-    const volumesErrors = validate(deployment, {
-      volumes: {
-        presence: true,
-        type: 'array',
-      },
-    })
-    if (volumesErrors) validationErrors = validationErrors.concat(volumesErrors)
-    else {
+    if (!Array.isArray(deployment.volumes)) {
+      validationErrors.push({ volumes: ['must be an array'] })
+    } else {
+      const volumeNames = new Set()
       for (const volume of deployment.volumes) {
         const volumeErrors = validate(volume, {
           name: {
             presence: true,
             type: 'string',
             format: {
-              pattern:
-                '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*',
+              pattern: RFC1123_PATTERN,
               message:
                 'of volume must be a lowercase RFC1123 hostname (a-z,0-9,-,.)',
             },
@@ -113,8 +116,45 @@ export function validateDeployment(deployment, userGroups = []) {
             },
           },
         })
-        if (volumeErrors)
+        if (volumeErrors) {
           validationErrors = validationErrors.concat(volumeErrors)
+          continue
+        }
+        // Volumes that make-stateful-set would silently drop: they need
+        // to either reference an existing (suffixed) claim, become a
+        // claim template (size) or be an in-memory emptyDir
+        if (
+          !volume.size &&
+          !volume.emptyDir?.sizeLimit &&
+          !isSuffixedVolumeName(volume.name)
+        ) {
+          validationErrors.push({
+            volumes: [
+              `'${volume.name}' needs a size or an emptyDir.sizeLimit`,
+            ],
+          })
+        }
+        volumeNames.add(volume.name)
+      }
+
+      // Mounts referencing undeclared volumes fail scheduling with an
+      // opaque Kubernetes error; reject them early
+      const mountChecks = [
+        ['containers', deployment.containers],
+        ['initContainers', deployment.initContainers || []],
+      ]
+      for (const [attribute, containers] of mountChecks) {
+        for (const container of containers) {
+          for (const mount of container.volumeMounts || []) {
+            if (mount.name && !volumeNames.has(mount.name)) {
+              validationErrors.push({
+                [attribute]: [
+                  `volume mount '${mount.name}' has no matching volume`,
+                ],
+              })
+            }
+          }
+        }
       }
     }
   }

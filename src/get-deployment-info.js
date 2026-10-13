@@ -3,8 +3,8 @@ import k8s from '@kubernetes/client-node'
 import { getDeploymentName } from './lib/util.js'
 import { servicesNamespace } from './lib/config.js'
 
-export async function getDeploymentInfo(user, deployment) {
-  const statefulSetName = getDeploymentName(user, deployment.id)
+export async function getDeploymentInfo(deployment) {
+  const statefulSetName = getDeploymentName(deployment.id)
   const appsClient = getKubernetesClient(servicesNamespace, k8s.AppsV1Api)
   const coreClient = getKubernetesClient(servicesNamespace)
   const { body: statefulSet } = await appsClient.readNamespacedStatefulSet(

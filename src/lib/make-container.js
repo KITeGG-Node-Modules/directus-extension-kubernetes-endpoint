@@ -41,7 +41,7 @@ export function makeContainer(c, servicePayloads, statefulSetName) {
       containerPort.containerPort = p.port
       return containerPort
     })
-    servicePayloads.push({ name: c.name, ports: c.ports })
+    servicePayloads?.push({ name: c.name, ports: c.ports })
   }
 
   container.env = (c.environment || []).map((e) => {
