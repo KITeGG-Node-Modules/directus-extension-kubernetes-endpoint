@@ -24,6 +24,54 @@ Pod-scoped endpoints (logs, events, pod deletion) additionally verify that
 the requested pod actually belongs to the deployment; requests for foreign
 or non-existent pods return `404`.
 
+### Required Kubernetes RBAC
+
+The extension performs every Kubernetes call with the credentials from
+`K8S_USER_TOKEN`, so that account must be allowed to read **and write** the
+extension's resources in the services namespace (`SERVICES_NAMESPACE`,
+default `services`). A ready-to-apply manifest is provided in
+[`k8s/rbac.yaml`](k8s/rbac.yaml).
+
+Required verbs per resource (within the services namespace):
+
+| Resource                  | Verbs                                                | Used by                                                                  |
+| ------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------ |
+| `apps/statefulsets`       | `get`, `list`, `create`, `update`, `patch`, `delete` | deploy, re-deploy (`update`), restart hook (`patch`), state/info, delete |
+| `apps/statefulsets/scale` | `update`, `patch`                                    | scaling (`PATCH /deployments/:id?scale=…`)                               |
+| `services`                | `get`, `create`, `patch`                             | deploy (ports of an existing service are patched)                        |
+| `configmaps`              | `get`, `create`, `update`, `delete`                  | config endpoints, delete                                                 |
+| `secrets`                 | `get`, `create`, `update`, `delete`                  | secret endpoints, delete                                                 |
+| `persistentvolumeclaims`  | `list`, `delete`                                     | deployment info, delete                                                  |
+| `pods`                    | `list`, `delete`                                     | state/info/logs/events, delete pod                                       |
+| `pods/log`                | `get`                                                | pod logs                                                                 |
+| `events.k8s.io/events`    | `get`, `list`                                        | pod events                                                               |
+
+> **Note:** verbs are evaluated per resource; permissions on `statefulsets`
+> do **not** imply permissions on the `statefulsets/scale` subresource. A
+> role that only grants read/create therefore still fails with `403` for
+> scaling, restarting, re-deploying existing services, secret/config
+> updates and deletion — while first-time deploys and all read endpoints
+> keep working.
+
+Additionally, `GET /kubernetes/capacity` reads cluster-scoped resources
+(nodes and pods across all namespaces) and needs a `ClusterRole` (included
+in `k8s/rbac.yaml`).
+
+To verify what the extension's account may do, run against the same cluster
+and token:
+
+```sh
+kubectl auth can-i update secrets --namespace services \
+  --server <cluster-url> --token "$K8S_USER_TOKEN"
+kubectl auth can-i patch statefulsets/scale --namespace services \
+  --server <cluster-url> --token "$K8S_USER_TOKEN"
+```
+
+A Kubernetes `403` surfaces in the error response `detail` as e.g.
+`update secrets is forbidden: User "…" cannot update resource "secrets" in
+API group "" in the namespace "services"` — this is distinct from the
+extension's own ownership `403` (`api_errors.forbidden`).
+
 The required payload for the service is:
 
 ```json

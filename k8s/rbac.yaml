@@ -1,0 +1,95 @@
+# Required RBAC for the KITeGG Kubernetes endpoint extension.
+#
+# The account whose credentials are provided via K8S_USER_TOKEN needs the
+# verbs below inside the services namespace (SERVICES_NAMESPACE, default
+# "services"). Replace the RoleBinding subject with the user/service
+# account the token identifies.
+#
+# Apply with:
+#   kubectl apply -f k8s/rbac.yaml
+# (adjust the namespace first if SERVICES_NAMESPACE is not "services")
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kitegg-directus-services
+  namespace: services
+rules:
+  # Deploy / re-deploy / restart / scale / state / delete
+  # Note: permissions on "statefulsets" do NOT cover the scale subresource.
+  - apiGroups: ['apps']
+    resources: ['statefulsets']
+    verbs: ['get', 'list', 'create', 'update', 'patch', 'delete']
+  - apiGroups: ['apps']
+    resources: ['statefulsets/scale']
+    verbs: ['update', 'patch']
+  # Services are created on deploy; an existing service's ports are patched
+  - apiGroups: ['']
+    resources: ['services']
+    verbs: ['get', 'list', 'create', 'patch']
+  # PUT/GET config and secret; delete removes them with the deployment
+  - apiGroups: ['']
+    resources: ['configmaps', 'secrets']
+    verbs: ['get', 'list', 'create', 'update', 'delete']
+  # Volume claims: listed in the deployment status, deleted on delete
+  - apiGroups: ['']
+    resources: ['persistentvolumeclaims']
+    verbs: ['list', 'delete']
+  # Pods: listed for status/logs/events, deleted via delete pod endpoint
+  - apiGroups: ['']
+    resources: ['pods']
+    verbs: ['list', 'delete']
+  - apiGroups: ['']
+    resources: ['pods/log']
+    verbs: ['get']
+  # Pod events (EventsV1Api reads the events.k8s.io group)
+  - apiGroups: ['events.k8s.io']
+    resources: ['events']
+    verbs: ['get', 'list']
+---
+# GET /kubernetes/capacity reads cluster-scoped resources: nodes and pods
+# across all namespaces. This requires a ClusterRole; without it only the
+# capacity endpoint fails, all other endpoints remain functional.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kitegg-directus-capacity
+rules:
+  - apiGroups: ['']
+    resources: ['nodes']
+    verbs: ['get', 'list']
+  - apiGroups: ['']
+    resources: ['pods']
+    verbs: ['get', 'list']
+---
+# Bind the namespace role. Choose the subject matching the token:
+# - ServiceAccount (in-cluster token):
+#     kind: ServiceAccount, name: <account>, namespace: <its namespace>
+# - Static/OIDC user token:
+#     kind: User, name: <username the token authenticates as>
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kitegg-directus-services
+  namespace: services
+subjects:
+  - kind: ServiceAccount
+    name: kitegg-directus # <-- replace
+    namespace: services # <-- replace with the SA's namespace
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kitegg-directus-services
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kitegg-directus-capacity
+subjects:
+  - kind: ServiceAccount
+    name: kitegg-directus # <-- replace
+    namespace: services # <-- replace with the SA's namespace
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kitegg-directus-capacity
