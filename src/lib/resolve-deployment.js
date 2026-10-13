@@ -1,11 +1,17 @@
-import { deploymentOwnerField, enforceDeploymentOwnership } from './config.js'
+import {
+  deploymentAuthorsField,
+  deploymentOwnerField,
+  enforceDeploymentOwnership,
+} from './config.js'
 import { COLLECTIONS } from './constants.js'
 
 /**
  * Load the deployment referenced by :id.
  *
  * Returns the deployment item, or null after sending a 404 response
- * when it does not exist.
+ * when it does not exist. The fields needed for the ownership check
+ * are requested explicitly, because M2M fields are otherwise returned
+ * as junction primary keys only.
  */
 export async function loadDeployment(ctx) {
   const { req, res, services } = ctx
@@ -14,7 +20,11 @@ export async function loadDeployment(ctx) {
     schema: req.schema,
     accountability: req.accountability,
   })
-  const deployment = await deploymentsService.readOne(req.params.id)
+  const fields = [deploymentOwnerField, 'user_created.id']
+  if (deploymentAuthorsField) {
+    fields.push(`${deploymentAuthorsField}.directus_users_id.id`)
+  }
+  const deployment = await deploymentsService.readOne(req.params.id, { fields })
   if (!deployment) {
     res.status(404)
     return null
@@ -23,18 +33,59 @@ export async function loadDeployment(ctx) {
 }
 
 /**
+ * Normalize a value that may be a raw id or a related item into an id
+ * string, or null when it holds no usable id.
+ */
+function toId(value) {
+  if (value == null) return null
+  if (typeof value === 'string') return value
+  if (typeof value === 'number') return String(value)
+  if (typeof value === 'object' && value.id != null) return toId(value.id)
+  return null
+}
+
+/**
+ * Extract the user id from one entry of the authors list. Entries are
+ * junction rows (`{ id, directus_users_id }`), nested user objects or
+ * plain user ids.
+ */
+function authorIdFrom(entry) {
+  if (entry == null || typeof entry !== 'object' || Array.isArray(entry)) {
+    return null
+  }
+  for (const key of ['directus_users_id', 'users_id', 'user']) {
+    const id = toId(entry[key])
+    if (id != null) return id
+  }
+  return toId(entry.id)
+}
+
+/**
  * Check that the requesting user owns the given deployment item.
  *
  * Admin users always have access. When enforcement is enabled, the
- * deployment's owner field must match the requesting user's id.
- * Returns false when the owner field is missing, so deployments without
- * an owner can never be mutated by non-admin users.
+ * requesting user must match any of the deployment's ownership fields:
+ * the owner field (default `user`), `user_created`, or the `authors`
+ * M2M list of users with rights on the deployment.
+ * Returns false when no ownership field is populated, so deployments
+ * without any owner can never be mutated by non-admin users.
  */
 export function isDeploymentOwner(req, user, deployment) {
   if (req.accountability?.admin) return true
   if (!enforceDeploymentOwnership) return true
-  const ownerId = deployment?.[deploymentOwnerField]
-  if (ownerId == null) return false
   const userId = user?.id ?? req.accountability?.user
-  return String(ownerId) === String(userId)
+  if (userId == null) return false
+  const ownerIds = new Set()
+  for (const field of [deploymentOwnerField, 'user_created']) {
+    const id = toId(deployment?.[field])
+    if (id != null) ownerIds.add(id)
+  }
+  const authors = deployment?.[deploymentAuthorsField]
+  if (authors != null) {
+    for (const entry of Array.isArray(authors) ? authors : [authors]) {
+      const id = authorIdFrom(entry) ?? toId(entry)
+      if (id != null) ownerIds.add(id)
+    }
+  }
+  return ownerIds.has(String(userId))
 }
