@@ -4,6 +4,7 @@
 	"icon": "extension",
 	"version": "1.0.0",
 	"license": "EUPL-1.2",
+	"author": "Mainz University of Applied Sciences",
 	"private": true,
 	"keywords": [
 		"directus",
