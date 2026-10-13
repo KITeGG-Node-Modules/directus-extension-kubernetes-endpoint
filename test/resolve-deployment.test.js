@@ -157,6 +157,7 @@ describe('loadDeployment', () => {
     })
     expect(readOneCalls[0].id).toBe('42')
     expect(readOneCalls[0].query.fields).toEqual([
+      '*',
       'user_created.id',
       'user_updated.id',
       'authors.directus_users_id.id',

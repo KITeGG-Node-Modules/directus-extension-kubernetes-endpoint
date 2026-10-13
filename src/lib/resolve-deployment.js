@@ -5,9 +5,10 @@ import { COLLECTIONS } from './constants.js'
  * Load the deployment referenced by :id.
  *
  * Returns the deployment item, or null after sending a 404 response
- * when it does not exist. The fields needed for the ownership check
- * are requested explicitly, because M2M fields are otherwise returned
- * as junction primary keys only.
+ * when it does not exist. The item is fetched in full (`*`) so the
+ * handlers can use any of its fields; the ownership fields are
+ * additionally requested as nested paths, because M2M fields are
+ * otherwise returned as junction primary keys only.
  */
 export async function loadDeployment(ctx) {
   const { req, res, services } = ctx
@@ -16,7 +17,7 @@ export async function loadDeployment(ctx) {
     schema: req.schema,
     accountability: req.accountability,
   })
-  const fields = ['user_created.id', 'user_updated.id']
+  const fields = ['*', 'user_created.id', 'user_updated.id']
   if (deploymentAuthorsField) {
     fields.push(`${deploymentAuthorsField}.directus_users_id.id`)
   }
