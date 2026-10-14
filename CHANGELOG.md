@@ -33,6 +33,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Scale query parameter is validated against the replica bounds before use
 - Deployment data is parsed before reservation checks, so invalid YAML returns a client error instead of an unhandled 500
 - Deployment loading dropped the deployment id by requesting ownership fields only, so every stateful set lookup failed with `statefulsets.apps "sd-undefined" not found`
+- Re-deploying a deployment with volumes failed with a Kubernetes `422` (`field is immutable`): the immutable volume claim templates of the existing stateful set are now preserved on update, and adding volumes to an existing deployment returns a client error instead
 
 ### Security
 

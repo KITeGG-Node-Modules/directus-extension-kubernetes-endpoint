@@ -12,12 +12,17 @@ function hasStatus(err, status) {
  * updates it. A 409 on create (a concurrent request won the race) falls
  * back to the update path instead of failing.
  *
+ * The read result is passed to the update callback (null when the resource
+ * did not exist yet or when the read lost the create race) so the update
+ * can preserve fields of the existing resource.
+ *
  * Returns { created: true } when the resource was newly created.
  */
 export async function upsert({ read, create, update }) {
   let exists = true
+  let current = null
   try {
-    await read()
+    current = await read()
   } catch (err) {
     if (!hasStatus(err, NOT_FOUND)) throw err
     exists = false
@@ -31,6 +36,6 @@ export async function upsert({ read, create, update }) {
       // Lost the create race against a concurrent request: update instead
     }
   }
-  await update()
+  await update(current)
   return { created: false }
 }
