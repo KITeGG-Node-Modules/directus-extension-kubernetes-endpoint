@@ -1,6 +1,7 @@
 import { getKubernetesClient } from './lib/get-kubernetes-client.js'
 import k8s from '@kubernetes/client-node'
 import { getDeploymentName } from './lib/util.js'
+import { isVolumeClaimOf } from './lib/util.js'
 import { servicesNamespace } from './lib/config.js'
 import { APP_LABEL_KEY } from './lib/constants.js'
 
@@ -38,6 +39,47 @@ async function deleteLabeledResources(
     try {
       await coreClient[deleteMethod](
         item.metadata.name,
+        servicesNamespace,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'Background'
+      )
+    } catch (err) {
+      if (!isNotFound(err)) errors.push(err)
+    }
+  }
+}
+
+/**
+ * Delete volume claims of the deployment that do not carry the label:
+ * claims created before volume claims were labeled (or scaled up after a
+ * re-deploy restored the unlabeled stored claim templates) would be missed
+ * by the label selector and leak their data. Claim names created from
+ * volume claim templates follow the pattern
+ * <template-name>-<statefulSetName>-<ordinal>.
+ */
+async function deleteUnlabeledVolumeClaims(
+  coreClient,
+  statefulSetName,
+  errors
+) {
+  let items = []
+  try {
+    const response =
+      await coreClient.listNamespacedPersistentVolumeClaim(servicesNamespace)
+    items = response.body.items
+  } catch (err) {
+    errors.push(err)
+    return
+  }
+  for (const item of items) {
+    const name = item?.metadata?.name
+    if (!isVolumeClaimOf(name, statefulSetName)) continue
+    try {
+      await coreClient.deleteNamespacedPersistentVolumeClaim(
+        name,
         servicesNamespace,
         undefined,
         undefined,
@@ -91,6 +133,10 @@ export async function deleteDeployment(deployment) {
     labelSelector,
     errors
   )
+  // Claims created before the deployment label was introduced do not match
+  // the label selector; also match them by claim name so their data is not
+  // leaked
+  await deleteUnlabeledVolumeClaims(coreClient, statefulSetName, errors)
   await deleteLabeledResources(
     coreClient,
     'listNamespacedSecret',
