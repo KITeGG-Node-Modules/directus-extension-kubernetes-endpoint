@@ -31,10 +31,11 @@ rules:
   - apiGroups: ['']
     resources: ['configmaps', 'secrets']
     verbs: ['get', 'list', 'create', 'update', 'delete']
-  # Volume claims: listed in the deployment status, deleted on delete
+  # Volume claims: labeled on re-deploy, listed in the deployment status,
+  # deleted on delete (unlabeled claims are matched by name)
   - apiGroups: ['']
     resources: ['persistentvolumeclaims']
-    verbs: ['list', 'delete']
+    verbs: ['list', 'patch', 'delete']
   # Pods: listed for status/logs/events, deleted via delete pod endpoint
   - apiGroups: ['']
     resources: ['pods']

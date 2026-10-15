@@ -93,3 +93,16 @@ export function isSuffixedVolumeName(name) {
   // <name>-sd-<uuid>-<ordinal>
   return VOLUME_SUFFIX_PATTERN.test(name)
 }
+
+/**
+ * Claim names created from a StatefulSet volume claim template follow the
+ * pattern <template-name>-<statefulSetName>-<ordinal>. Claims created
+ * before the deployment label was introduced (and claims scaled up after a
+ * re-deploy restored the unlabeled stored templates) do not carry the label
+ * and can only be matched by their name.
+ */
+export function isVolumeClaimOf(name, statefulSetName) {
+  const suffix = `-${statefulSetName}-`
+  const index = typeof name === 'string' ? name.lastIndexOf(suffix) : -1
+  return index > 0 && /^\d+$/.test(name.slice(index + suffix.length))
+}
