@@ -23,16 +23,6 @@ export async function scaleDeployment(ctx) {
   }
   try {
     const deploymentData = parseDeploymentData(deployment)
-    const isValid = await checkReservation(
-      req,
-      services,
-      deployment,
-      deploymentData
-    )
-    if (!isValid) {
-      res.status(400)
-      return { message: 'api_errors.not_enough_resources' }
-    }
     const statefulSetName = getDeploymentName(deployment.id)
     const client = getKubernetesClient(servicesNamespace, k8s.AppsV1Api)
     if (typeof scale !== 'undefined') {
@@ -41,6 +31,21 @@ export async function scaleDeployment(ctx) {
       if (replicas === null) {
         res.status(400)
         return { message: 'api_errors.bad_request' }
+      }
+      // Scaling to zero frees resources, so it must always be possible:
+      // otherwise a deployment whose GPU reservations no longer cover
+      // its demand could not be scaled down at all
+      if (replicas > 0) {
+        const isValid = await checkReservation(
+          req,
+          services,
+          deployment,
+          deploymentData
+        )
+        if (!isValid) {
+          res.status(400)
+          return { message: 'api_errors.not_enough_resources' }
+        }
       }
       const { body: existing } = await client.listNamespacedStatefulSet(
         servicesNamespace,
