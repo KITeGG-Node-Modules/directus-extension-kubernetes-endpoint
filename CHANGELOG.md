@@ -35,6 +35,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Deployment loading dropped the deployment id by requesting ownership fields only, so every stateful set lookup failed with `statefulsets.apps "sd-undefined" not found`
 - Scaling a deployment to 0 was rejected when the GPU reservations no longer covered its demand: scaling to zero frees resources, so it now skips the reservation check and is always possible
 - Restarting a deployment and deleting one of its pods were rejected when the GPU reservations no longer covered the deployment's demand: neither operation changes the GPU demand, so they no longer run the reservation check
+- Reservation checks computed the GPU demand from the replica count stored in the deployment data instead of the requested scale: the stored count is not updated by scaling, so scaling up could exceed the reserved GPUs
 
 ### Security
 

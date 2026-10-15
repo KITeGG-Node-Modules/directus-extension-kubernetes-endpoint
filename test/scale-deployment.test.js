@@ -108,24 +108,28 @@ describe('scaleDeployment', () => {
     expect(options.headers['Content-type']).toBe('application/json-patch+json')
   })
 
-  it('checks the reservation before scaling up', async () => {
+  it('checks the reservation against the scale target before scaling up', async () => {
     const client = makeK8sClient()
     getKubernetesClient.mockReturnValue(client)
 
-    const { ctx, result } = await scaleTo('2')
+    // The deployment data still stores replicas: 2, but the request scales
+    // to 3: the check must use the requested target, otherwise scaling up
+    // could exceed the reserved GPUs
+    const { ctx, result } = await scaleTo('3')
 
     expect(result).toEqual({ success: true })
     expect(ctx.res.code).toBeNull()
     expect(checkReservation).toHaveBeenCalledTimes(1)
     expect(checkReservation).toHaveBeenCalledWith(
-      expect.objectContaining({ query: { scale: '2' } }),
+      expect.objectContaining({ query: { scale: '3' } }),
       expect.objectContaining({ ItemsService: expect.any(Function) }),
       DEPLOYMENT,
-      expect.objectContaining({ replicas: 2 })
+      expect.objectContaining({ replicas: 2 }),
+      { replicas: 3 }
     )
     const patch = client.patchNamespacedStatefulSetScale.mock.calls[0][2]
     expect(patch).toEqual([
-      { op: 'replace', path: '/spec', value: { replicas: 2 } },
+      { op: 'replace', path: '/spec', value: { replicas: 3 } },
     ])
   })
 

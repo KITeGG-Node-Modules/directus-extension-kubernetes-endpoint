@@ -36,11 +36,15 @@ export async function scaleDeployment(ctx) {
       // otherwise a deployment whose GPU reservations no longer cover
       // its demand could not be scaled down at all
       if (replicas > 0) {
+        // The check must use the scale target: the replica count stored
+        // in the deployment data is not updated by scaling, so checking
+        // it would let scaling up exceed the reserved GPUs
         const isValid = await checkReservation(
           req,
           services,
           deployment,
-          deploymentData
+          deploymentData,
+          { replicas }
         )
         if (!isValid) {
           res.status(400)
