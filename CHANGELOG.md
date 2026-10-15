@@ -34,6 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Deployment data is parsed before reservation checks, so invalid YAML returns a client error instead of an unhandled 500
 - Deployment loading dropped the deployment id by requesting ownership fields only, so every stateful set lookup failed with `statefulsets.apps "sd-undefined" not found`
 - Scaling a deployment to 0 was rejected when the GPU reservations no longer covered its demand: scaling to zero frees resources, so it now skips the reservation check and is always possible
+- Restarting a deployment and deleting one of its pods were rejected when the GPU reservations no longer covered the deployment's demand: neither operation changes the GPU demand, so they no longer run the reservation check
 
 ### Security
 

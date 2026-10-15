@@ -1,16 +1,11 @@
 import { getKubernetesClient } from '../lib/get-kubernetes-client.js'
-import { checkReservation } from '../lib/check-reservation.js'
 import { servicesNamespace } from '../lib/config.js'
 import { isDeploymentOwner, loadDeployment } from '../lib/resolve-deployment.js'
-import {
-  getDeploymentName,
-  handleErrorResponse,
-  parseDeploymentData,
-} from '../lib/util.js'
+import { getDeploymentName, handleErrorResponse } from '../lib/util.js'
 import { getOwnedPod } from '../lib/get-owned-pod.js'
 
 export async function deleteDeploymentPod(ctx) {
-  const { req, res, user, services } = ctx
+  const { req, res, user } = ctx
   const { podName } = req.params
   if (!podName) {
     res.status(400)
@@ -25,17 +20,6 @@ export async function deleteDeploymentPod(ctx) {
     return { message: 'api_errors.forbidden' }
   }
   try {
-    const deploymentData = parseDeploymentData(deployment)
-    const isValid = await checkReservation(
-      req,
-      services,
-      deployment,
-      deploymentData
-    )
-    if (!isValid) {
-      res.status(400)
-      return { message: 'api_errors.not_enough_resources' }
-    }
     const statefulSetName = getDeploymentName(deployment.id)
     const pod = await getOwnedPod(statefulSetName, podName)
     if (!pod) {

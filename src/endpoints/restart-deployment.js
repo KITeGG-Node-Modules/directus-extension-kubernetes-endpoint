@@ -1,17 +1,12 @@
 import { getKubernetesClient } from '../lib/get-kubernetes-client.js'
 import k8s from '@kubernetes/client-node'
-import { checkReservation } from '../lib/check-reservation.js'
 import { servicesNamespace } from '../lib/config.js'
 import { RESTART_ANNOTATION_KEY } from '../lib/constants.js'
 import { isDeploymentOwner, loadDeployment } from '../lib/resolve-deployment.js'
-import {
-  getDeploymentName,
-  handleErrorResponse,
-  parseDeploymentData,
-} from '../lib/util.js'
+import { getDeploymentName, handleErrorResponse } from '../lib/util.js'
 
 export async function restartDeployment(ctx) {
-  const { req, res, user, services } = ctx
+  const { req, res, user } = ctx
   const deployment = await loadDeployment(ctx)
   if (!deployment) {
     return { message: 'api_errors.not_found' }
@@ -21,17 +16,6 @@ export async function restartDeployment(ctx) {
     return { message: 'api_errors.forbidden' }
   }
   try {
-    const deploymentData = parseDeploymentData(deployment)
-    const isValid = await checkReservation(
-      req,
-      services,
-      deployment,
-      deploymentData
-    )
-    if (!isValid) {
-      res.status(400)
-      return { message: 'api_errors.not_enough_resources' }
-    }
     const statefulSetName = getDeploymentName(deployment.id)
     const client = getKubernetesClient(servicesNamespace, k8s.AppsV1Api)
     const { body: existing } = await client.listNamespacedStatefulSet(
