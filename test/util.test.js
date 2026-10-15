@@ -4,6 +4,7 @@ import {
   getNameSlug,
   handleErrorResponse,
   isSuffixedVolumeName,
+  isVolumeClaimOf,
   parseDeploymentData,
   parseScale,
 } from '../src/lib/util.js'
@@ -28,6 +29,31 @@ describe('isSuffixedVolumeName', () => {
     ).toBe(true)
     expect(isSuffixedVolumeName('mydata')).toBe(false)
     expect(isSuffixedVolumeName('data-sd-not-a-uuid-0')).toBe(false)
+  })
+})
+
+describe('isVolumeClaimOf', () => {
+  it('matches template claim names of the stateful set', () => {
+    expect(isVolumeClaimOf('data-sd-5-0', 'sd-5')).toBe(true)
+    expect(isVolumeClaimOf('scratch-sd-5-15', 'sd-5')).toBe(true)
+    expect(isVolumeClaimOf('data-sd-123e4567-e89b-12d3-a456-426614174000-0', 'sd-123e4567-e89b-12d3-a456-426614174000')).toBe(
+      true
+    )
+  })
+
+  it('rejects claims of other deployments and non-claim names', () => {
+    expect(isVolumeClaimOf('data-sd-5-0', 'sd-6')).toBe(false)
+    expect(isVolumeClaimOf('data-sd-5-0-extra', 'sd-5')).toBe(false)
+    expect(isVolumeClaimOf('data-sd-5-x', 'sd-5')).toBe(false)
+    expect(isVolumeClaimOf('data-sd-5', 'sd-5')).toBe(false)
+    expect(isVolumeClaimOf('mydata', 'sd-5')).toBe(false)
+    expect(isVolumeClaimOf(undefined, 'sd-5')).toBe(false)
+  })
+
+  it('does not match restored claim names of other deployments', () => {
+    expect(
+      isVolumeClaimOf('data-sd-123e4567-e89b-12d3-a456-426614174000-0', 'sd-5')
+    ).toBe(false)
   })
 })
 
