@@ -1,0 +1,183 @@
+# Ingress protection for the SYSTEM-INTERNAL services sharing the
+# services namespace with user workloads (KITeGG Kubernetes endpoint).
+#
+# ROLE: closes the last cluster-wide path. The user-workload
+# NetworkPolicies (per deployment + the static hardening layer) already
+# deny user pods access to these services — but from anywhere else in
+# the cluster (e.g. the jupyterhub namespace, whose egress is
+# deliberately unrestricted) these services were reachable. This
+# manifest fixes that. EGRESS of the system services is deliberately
+# NOT touched (policyTypes: Ingress only) — they need the Kubernetes
+# API, the internet and the user workloads.
+#
+# TRAFFIC MATRIX (verified against the routing configuration in the
+# jupyterhub repo and the live workload specs — MAINTENANCE: re-verify
+# when services/routes are added):
+#
+#   cache (Redis, oauth2-proxy SESSION store — REDIS_URL=redis://cache:6379)
+#     <- service-proxy pods, port 6379           (ONLY confirmed consumer)
+#
+#   service-proxy (oauth2-proxy; wildcard *.service.kitegg.hs-mainz.de)
+#     <- traefik-v2 namespace, port 80           (Traefik wildcard route)
+#     <- nginx pods, port 80                     (NGINX TLS proxy, NodePort :30443
+#                                                 forwards into service-proxy)
+#
+#   nginx (TLS termination for the NodePort :30443 entry point)
+#     <- ANY source, port 443 ONLY               (public entry point by design;
+#                                                 NodePort sources are external
+#                                                 IPs and cannot be enumerated)
+#
+#   openwebui (public WebUI, own Traefik host)
+#     <- traefik-v2 namespace, port 8080
+#
+#   openwebui-ccl (internal instance, NO Traefik route exists)
+#     <- traefik-v2 namespace, service-proxy, tty-server, openwebui pods
+#     (the widest set of plausible system consumers — tighten after
+#      verifying who actually uses it)
+#
+#   tty-server (interactive terminals, own Traefik host)
+#     <- traefik-v2 namespace, port 2020
+#     (reaches user pods via the Kubernetes API — KUBECONFIG/exec; that
+#      traffic flows host->pod and is unaffected by pod NetworkPolicies)
+#
+# NOT covered here:
+#   - kuberay-operator: controller traffic towards user pods; no Ray
+#     workloads exist today. If Ray heads are ever deployed through the
+#     extension, the per-deployment policies need an operator peer rule.
+#   - kubelet probes and exec/attach: originate on the host and are not
+#     governed by pod NetworkPolicies.
+#
+# ROLLBACK: kubectl delete -f k8s/system-services-policy.yaml
+# (also the smoke test: every entry point above must keep answering
+# immediately after applying)
+#
+# Apply LAST, after the per-deployment policies are in place:
+#   kubectl apply -f k8s/system-services-policy.yaml
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: system-cache-ingress
+  namespace: services
+spec:
+  podSelector:
+    matchLabels:
+      app: cache
+  policyTypes:
+    - Ingress
+  ingress:
+    # oauth2-proxy session store — the only confirmed consumer
+    - from:
+        - podSelector:
+            matchLabels:
+              app: service-proxy
+      ports:
+        - port: 6379
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: system-service-proxy-ingress
+  namespace: services
+spec:
+  podSelector:
+    matchLabels:
+      app: service-proxy
+  policyTypes:
+    - Ingress
+  ingress:
+    # Traefik (wildcard route) and the NGINX TLS proxy hop
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: traefik-v2
+        - podSelector:
+            matchLabels:
+              app: nginx
+      ports:
+        - port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: system-nginx-tls-proxy-ingress
+  namespace: services
+spec:
+  podSelector:
+    matchLabels:
+      app: nginx
+  policyTypes:
+    - Ingress
+  ingress:
+    # Public TLS entry point (NodePort :30443) — sources are external
+    # client IPs; restrict to the TLS port only
+    - ports:
+        - port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: system-openwebui-ingress
+  namespace: services
+spec:
+  podSelector:
+    matchLabels:
+      app: openwebui
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: traefik-v2
+      ports:
+        - port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: system-openwebui-ccl-ingress
+  namespace: services
+spec:
+  podSelector:
+    matchLabels:
+      app: openwebui-ccl
+  policyTypes:
+    - Ingress
+  ingress:
+    # No Traefik route exists for this instance; allow the plausible
+    # system consumers until its usage is verified (see header)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: traefik-v2
+        - podSelector:
+            matchLabels:
+              app: service-proxy
+        - podSelector:
+            matchLabels:
+              app: tty-server
+        - podSelector:
+            matchLabels:
+              app: openwebui
+      ports:
+        - port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: system-tty-server-ingress
+  namespace: services
+spec:
+  podSelector:
+    matchLabels:
+      app: tty-server
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: traefik-v2
+      ports:
+        - port: 2020

@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `GET /deployments-running` endpoint listing the ids of deployments that currently have pods in the Running state
 - Deployment ownership enforcement on all mutating endpoints: non-admin users can only scale, restart, delete, or change the secret and config of deployments they own. Ownership derives from the deployment's `user_created`, `user_updated` and `authors` fields; `DEPLOYMENT_AUTHORS_FIELD` configures the authors list (an empty value disables that source) and `ENFORCE_DEPLOYMENT_OWNERSHIP=false` disables the check entirely
 - Required Kubernetes RBAC documented, with a ready-to-apply `k8s/rbac.yaml` manifest
+- Cluster-side hardening manifests in `k8s/` (applied by admins, independent of the extension): Pod Security Admission staging for the namespace (`pod-security.yaml`), ResourceQuota + LimitRange bounding total namespace compute and object counts (`resource-quota.yaml`), and ingress protection for the system-internal services with the verified traffic matrix (`system-services-policy.yaml`) — closing the cluster-wide path to the oauth2-proxy session store and the ingress path from other namespaces
 - Test suite (Vitest), ESLint and CI
 - Licensed under the EUPL, Version 1.2
 

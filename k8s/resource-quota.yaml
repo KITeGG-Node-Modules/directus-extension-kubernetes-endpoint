@@ -1,0 +1,70 @@
+# ResourceQuota + LimitRange for the services namespace (user workloads).
+#
+# ROLE: bound what the namespace can consume IN TOTAL — container limits
+# (set per container by the extension) cap each pod, but nothing stops
+# many pods. The quota makes resource exhaustion a cluster guarantee
+# instead of an application-level accounting.
+#
+# SIZING (measured on the live cluster, 2026-10): the limits of ALL
+# declared pod templates sum to 130 cores / 916 Gi / 17 GPUs across 139
+# stateful sets (~35 running at any time; scaled-to-zero sets reserve
+# nothing). The quota is set at roughly +50% headroom on every dimension
+# — raise it before large planned batches, it applies to NEW pods only
+# and never disturbs running ones.
+#
+# CAVEATS:
+#   - The quota covers the SYSTEM services too (cache, openwebui,
+#     service-proxy, tty-server, nginx, kuberay-operator share this
+#     namespace). Leave generous headroom: a too-tight quota can make
+#     system pods unschedulable after a node failure.
+#   - The LimitRange is REQUIRED next to the quota: the extension sets
+#     container limits but not CPU/memory requests (except GPUs, where
+#     requests == limits), and a `requests.*` quota rejects pods without
+#     requests. The LimitRange defaults fill those in at admission
+#     (pods with explicit values are untouched).
+#   - User workloads are additionally scheduled onto dedicated worker
+#     nodes (NODE_SELECTOR) — the quota bounds the aggregate, the node
+#     selector bounds the placement.
+#
+# Apply: kubectl apply -f k8s/resource-quota.yaml
+# Verify: kubectl describe resourcequota,limitrange -n services
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: user-workloads-quota
+  namespace: services
+spec:
+  hard:
+    # Compute — requests AND limits are both bounded (requests reflect
+    # scheduling, limits reflect actual consumption)
+    requests.cpu: '200'
+    requests.memory: 1500Gi
+    requests.nvidia.com/gpu: '24'
+    limits.cpu: '200'
+    limits.memory: 1500Gi
+    limits.nvidia.com/gpu: '24'
+    # Object counts — 139 stateful sets / ~170 PVCs exist today
+    count/statefulsets.apps: '250'
+    persistentvolumeclaims: '300'
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: user-workloads-limits
+  namespace: services
+spec:
+  limits:
+    # Defaults for containers that declare nothing (system services);
+    # the extension's containers always declare their own values
+    - type: Container
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      default:
+        cpu: '4'
+        memory: 32Gi
+      # Mirrors the extension's own GPU bound (management users may
+      # request up to 8 GPUs per container)
+      max:
+        nvidia.com/gpu: '8'

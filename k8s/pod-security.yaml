@@ -1,0 +1,38 @@
+# Pod Security Admission for the services namespace (user workloads).
+#
+# ROLE: defense in depth against a compromised extension account or a
+# future bug in the deploy path — the admission controller rejects
+# `privileged`, `hostPath`, `hostNetwork`, host PIDs/IPC and host ports
+# AT ADMISSION, no matter what pod template reaches the API server.
+#
+# Verified against the live cluster before writing this manifest: NO
+# stateful set or deployment pod template in the namespace uses any of
+# those features (checked: privileged, hostPath, hostNetwork/PID/IPC,
+# hostPorts, SYS_ADMIN caps) — `baseline` is safe to enforce.
+#
+# STAGED ROLLOUT (reversible at every step, affects only NEW pods):
+#   1. Apply this file as-is: `warn` (visible warning on create) and
+#      `audit` (annotation on violations) are active, `enforce` is
+#      commented out. Existing pods are never affected by PSA.
+#   2. Watch for warnings: kubectl get events -n services
+#      and run a deploy of every deployment shape you care about.
+#   3. After a quiet period, uncomment `enforce: baseline` and re-apply.
+#
+# `restricted` would likely reject legitimate ML images (writable root
+# filesystems); it is deliberately NOT set for enforce. If you want its
+# signal, add `pod-security.kubernetes.io/audit: restricted`.
+#
+# NOTE: user containers are additionally hardened by the extension
+# itself (no service account token, RuntimeDefault seccomp, dropped
+# capabilities, runAsNonRoot) — see README "Container hardening". This
+# manifest protects against the deploy path being bypassed entirely.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: services
+  labels:
+    pod-security.kubernetes.io/warn: baseline
+    pod-security.kubernetes.io/audit: baseline
+    # Uncomment after a quiet warn/audit period:
+    # pod-security.kubernetes.io/enforce: baseline

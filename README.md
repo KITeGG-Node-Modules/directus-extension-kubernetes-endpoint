@@ -205,6 +205,33 @@ namespace, add its `app` label value to `SYSTEM_APP_LABEL_VALUES`
 (`src/lib/constants.js`), redeploy the extension, and re-run the backfill
 — otherwise user workloads may reach it.
 
+**Cluster hardening manifests** (admin-owned, in [`k8s/`](k8s/), applied
+independently of the extension):
+
+1. [`k8s/pod-security.yaml`](k8s/pod-security.yaml) — Pod Security
+   Admission on the namespace. Stage it: `warn`/`audit: baseline` first,
+   watch for warnings, then uncomment `enforce: baseline`. Verified: no
+   current workload template violates baseline.
+2. [`k8s/resource-quota.yaml`](k8s/resource-quota.yaml) — ResourceQuota
+   + LimitRange bounding the namespace's total compute (sized at ~+50%
+   over the measured ceiling) and object counts. The LimitRange is
+   required next to the quota: it defaults CPU/memory requests for
+   pods that declare none (the extension sets limits, requests only for
+   GPUs). Applies to new pods only.
+3. [`k8s/system-services-policy.yaml`](k8s/system-services-policy.yaml)
+   — ingress protection for the system-internal services (`cache`,
+   `service-proxy`, `nginx`, `openwebui*`, `tty-server`), closing the
+   cluster-wide path to them (user pods were already denied via the
+   policies above; other namespaces — e.g. jupyterhub — were not). The
+   header documents the verified traffic matrix (oauth2-proxy sessions
+   live in `cache`, Traefik/nginx are the ingress path, tty-server
+   reaches user pods via the API). Egress of the system services is
+   untouched; apply last and smoke-test the entry points immediately.
+
+MAINTENANCE: all three manifests encode live cluster facts (CIDRs,
+traffic routes, sizing). Re-verify them when services, routes or
+scales change — pointers are in each file's header.
+
 To verify what the extension's account may do, run against the same cluster
 and token:
 
