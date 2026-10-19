@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-19
+
 ### Added
 
 - Network isolation for user deployments via per-deployment NetworkPolicies, created and replaced with every deploy and selected by the deployment's `app` label, so existing deployments are isolated without any pod template change and without restarting anything
