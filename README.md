@@ -220,6 +220,71 @@ A Kubernetes `403` surfaces in the error response `detail` as e.g.
 API group "" in the namespace "services"` — this is distinct from the
 extension's own ownership `403` (`api_errors.forbidden`).
 
+### Container hardening
+
+Deployed containers run under a hardened, non-negotiable-by-default
+security context (see the YAML reference above for the user-facing
+fields). Changes are part of the pod template, so they apply on each
+deployment's **next redeploy** — running pods are never restarted by a
+hardening rollout:
+
+| Default | Opt-out (per container, in the YAML) |
+|---|---|
+| No service account token mounted (`automountServiceAccountToken: false`) | none — user pods never reach the Kubernetes API (blocked by egress policies), the token would only be theft bait |
+| Seccomp profile `RuntimeDefault` | `seccomp: false` (e.g. for `strace`/`perf`) |
+| Linux capabilities: `drop: ['ALL']`, `add: ['NET_BIND_SERVICE', ...requested]` | `capabilities: [...]` may request further capabilities from `ALLOWED_CAPABILITIES` (`src/lib/constants.js` — the Docker/containerd default set: `CHOWN`, `SETUID`, `NET_RAW`, …). `NET_BIND_SERVICE` is granted implicitly so images serving on port 80/443 keep working; `SYS_ADMIN`, `NET_ADMIN`, `SYS_PTRACE` etc. are never available |
+| `runAsNonRoot: true` | `runAsRoot: true` |
+
+Images must come from an allowed registry
+(`DEFAULT_IMAGE_REGISTRIES` in `src/lib/constants.js`: docker.io,
+ghcr.io, quay.io, nvcr.io, mcr.microsoft.com, registry.kitegg.de,
+registry.motionbank.org). The env var `IMAGE_REGISTRY_ALLOWLIST`
+(comma-separated) replaces the default list; `*` disables the check.
+Bare image names resolve per the Docker reference rules
+(`pytorch/pytorch`, `nginx:latest` and `ubuntu@sha256:…` all mean
+docker.io). Deployments referencing other registries are rejected at
+deploy time with the allowed list in the error message.
+
+**Admin playbook:**
+
+- Audit what is deployed versus the defaults (expect these lists to
+  start full and shrink as users redeploy):
+
+  ```sh
+  # deployments running as root (runAsRoot opt-out)
+  kubectl get sts -n services -o json | jq -r '
+    .items[] | select(.spec.template.spec.securityContext.runAsNonRoot != true)
+    | .metadata.name'
+  # containers with capabilities beyond the default grant
+  kubectl get sts -n services -o json | jq -r '
+    .items[] | .metadata.name as $sts |
+    .spec.template.spec.containers[]?
+    | select(((.securityContext.capabilities.add // []) - ["NET_BIND_SERVICE"]) | length > 0)
+    | "\($sts)/\(.name)"'
+  # containers without the seccomp profile / with the token mounted
+  kubectl get sts -n services -o json | jq -r '
+    .items[] | .metadata.name as $sts |
+    .spec.template.spec.containers[]?
+    | select(.securityContext.seccompProfile.type != "RuntimeDefault")
+    | "\($sts)/\(.name)"'
+  kubectl get sts -n services -o json | jq -r '
+    .items[] | select(.spec.template.spec.automountServiceAccountToken != false)
+    | .metadata.name'
+  ```
+
+- To allow a capability that is not in the default set, add it to
+  `ALLOWED_CAPABILITIES`, rebuild and redeploy the extension — it takes
+  effect on the requesting deployment's next redeploy. Prefer builder
+  alternatives where they exist (volume ownership via `fsUser`/
+  `fsGroup` instead of `CHOWN`).
+
+- Known-impossible requests, so you can answer them quickly: mounting
+  external storage via FUSE (`rclone`, `sshfs`) needs `SYS_ADMIN` *and*
+  a `/dev/fuse` device passthrough, which the deployment model does not
+  offer — use PVCs/volumes instead; debuggers/profilers attaching to
+  other processes (`SYS_PTRACE`) are not allowed — use logs and the pod
+  events endpoints.
+
 The required payload for the service is:
 
 ```json
