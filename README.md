@@ -273,7 +273,8 @@ containers:
     # Container hardening (all on by default)
     runAsRoot: false # true: allow the image to run as root (opt-out of runAsNonRoot)
     seccomp: true # false: disable the default seccomp profile (e.g. for strace/perf)
-    capabilities: ['NET_BIND_SERVICE'] # capabilities granted beyond the default drop of ALL
+    capabilities: ['CHOWN'] # extra capabilities beyond the drop of ALL;
+    # NET_BIND_SERVICE is always granted so images serving on port 80/443 keep working
     # Images must come from an allowed registry (docker.io, ghcr.io, quay.io,
     # nvcr.io, mcr.microsoft.com, registry.kitegg.de, registry.motionbank.org;
     # IMAGE_REGISTRY_ALLOWLIST env overrides, '*' disables the check)

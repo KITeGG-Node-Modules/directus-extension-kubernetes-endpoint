@@ -51,7 +51,9 @@ describe('makeContainer', () => {
     expect(container.securityContext.allowPrivilegeEscalation).toBe(false)
     expect(container.securityContext.seccompProfile.type).toBe('RuntimeDefault')
     expect(container.securityContext.capabilities.drop).toEqual(['ALL'])
-    expect(container.securityContext.capabilities.add).toBeUndefined()
+    expect(container.securityContext.capabilities.add).toEqual([
+      'NET_BIND_SERVICE',
+    ])
   })
 
   it('allows opting out of non-root and seccomp per container', () => {
@@ -73,10 +75,22 @@ describe('makeContainer', () => {
 
   it('adds requested capabilities on top of the drop of ALL', () => {
     const container = makeContainer(
-      { name: 'app', image: 'app', capabilities: ['NET_BIND_SERVICE'] },
+      { name: 'app', image: 'app', capabilities: ['CHOWN', 'SETUID'] },
       []
     )
     expect(container.securityContext.capabilities.drop).toEqual(['ALL'])
+    expect(container.securityContext.capabilities.add).toEqual([
+      'NET_BIND_SERVICE',
+      'CHOWN',
+      'SETUID',
+    ])
+  })
+
+  it('does not duplicate NET_BIND_SERVICE when requested explicitly', () => {
+    const container = makeContainer(
+      { name: 'app', image: 'app', capabilities: ['NET_BIND_SERVICE'] },
+      []
+    )
     expect(container.securityContext.capabilities.add).toEqual([
       'NET_BIND_SERVICE',
     ])

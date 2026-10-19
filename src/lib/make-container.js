@@ -19,15 +19,20 @@ export function makeContainer(c, servicePayloads, statefulSetName) {
     container.securityContext.seccompProfile.type = 'RuntimeDefault'
   }
 
-  // Capabilities: drop ALL, add back only what the user requests. The
-  // requestable set is the Docker/containerd default (ALLOWED_CAPABILITIES),
-  // validated in validate-container.js — so an image that ran on plain
-  // Docker keeps working, while nothing gains privileges it never had.
+  // Capabilities: drop ALL, add back the Docker/containerd default set —
+  // requested by the user or NET_BIND_SERVICE implicitly. NET_BIND_SERVICE
+  // is granted by default: serving on a low port (<1024) only affects the
+  // pod's own IP and is the most common image default (port 80/443 web
+  // UIs) — without it those crash-loop on redeploy. Everything beyond the
+  // default set (SYS_ADMIN, ...) was never available on plain Docker and
+  // stays unavailable. Requests are validated in validate-container.js.
   container.securityContext.capabilities = new k8s.V1Capabilities()
   container.securityContext.capabilities.drop = ['ALL']
-  if (Array.isArray(c.capabilities) && c.capabilities.length) {
-    container.securityContext.capabilities.add = [...c.capabilities]
-  }
+  const requested = Array.isArray(c.capabilities) ? c.capabilities : []
+  container.securityContext.capabilities.add = [
+    'NET_BIND_SERVICE',
+    ...requested.filter((capability) => capability !== 'NET_BIND_SERVICE'),
+  ]
 
   // Non-root by default: images whose entrypoint needs root can opt out
   // with `runAsRoot: true` (visible in the YAML, easy to audit)
