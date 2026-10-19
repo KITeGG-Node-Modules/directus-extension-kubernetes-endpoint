@@ -41,6 +41,10 @@ export function makeStatefulSet(name, deployment) {
   podSpec.nodeSelector = NODE_SELECTOR
   podSpec.restartPolicy = deployment.restartPolicy || 'Always'
   podSpec.enableServiceLinks = false
+  // User workloads never talk to the Kubernetes API (blocked by their
+  // egress policies anyway) — don't hand them a usable service account
+  // token to steal
+  podSpec.automountServiceAccountToken = false
 
   function parseContainers(containers, payloads) {
     return containers.map((c) => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateContainer } from '../src/lib/validate-container.js'
+import { imageRegistry, validateContainer } from '../src/lib/validate-container.js'
 
 describe('validateContainer', () => {
   it('accepts a minimal container', () => {
@@ -86,5 +86,58 @@ describe('validateContainer', () => {
       ports: [{ name: 'http', port: 0 }],
     })
     expect(errors.length).toBeGreaterThan(0)
+  })
+
+  it('accepts images from the default registries and bare names', () => {
+    const base = { name: 'app' }
+    expect(validateContainer({ ...base, image: 'pytorch/pytorch:latest' })).toEqual([]) // docker.io
+    expect(validateContainer({ ...base, image: 'nginx' })).toEqual([]) // docker.io
+    expect(validateContainer({ ...base, image: 'nvcr.io/nvidia/cuda:12' })).toEqual([])
+    expect(validateContainer({ ...base, image: 'registry.kitegg.de/models/vllm' })).toEqual([])
+    expect(validateContainer({ ...base, image: 'registry.motionbank.org/app:1' })).toEqual([])
+    expect(validateContainer({ ...base, image: 'ghcr.io/owner/repo' })).toEqual([])
+  })
+
+  it('rejects images from unknown registries, listing the allowlist', () => {
+    const errors = validateContainer({
+      name: 'app',
+      image: 'evil.example.net/miner:latest',
+    })
+    expect(errors.length).toBeGreaterThan(0)
+    expect(errors[0].image[0]).toContain('evil.example.net')
+    expect(errors[0].image[0]).toContain('registry.kitegg.de')
+  })
+
+  it('accepts whitelisted capabilities and rejects others', () => {
+    const base = { name: 'app', image: 'app' }
+    expect(
+      validateContainer({ ...base, capabilities: ['NET_BIND_SERVICE'] })
+    ).toEqual([])
+    expect(
+      validateContainer({ ...base, capabilities: ['SYS_ADMIN'] }).length
+    ).toBeGreaterThan(0)
+    expect(
+      validateContainer({ ...base, capabilities: 'NET_BIND_SERVICE' }).length
+    ).toBeGreaterThan(0)
+  })
+
+  it('rejects non-boolean hardening opt-outs', () => {
+    const base = { name: 'app', image: 'app' }
+    expect(validateContainer({ ...base, runAsRoot: true })).toEqual([])
+    expect(validateContainer({ ...base, seccomp: false })).toEqual([])
+    expect(validateContainer({ ...base, runAsRoot: 'yes' }).length).toBeGreaterThan(0)
+    expect(validateContainer({ ...base, seccomp: 'no' }).length).toBeGreaterThan(0)
+  })
+})
+
+describe('imageRegistry', () => {
+  it('resolves registries per the Docker reference rules', () => {
+    expect(imageRegistry('pytorch/pytorch:latest')).toBe('docker.io')
+    expect(imageRegistry('nginx')).toBe('docker.io')
+    expect(imageRegistry('ubuntu@sha256:abc')).toBe('docker.io')
+    expect(imageRegistry('nvcr.io/nvidia/cuda')).toBe('nvcr.io')
+    expect(imageRegistry('my-reg.lan:5000/app')).toBe('my-reg.lan:5000')
+    expect(imageRegistry('localhost/app')).toBe('localhost')
+    expect(imageRegistry(null)).toBe(null)
   })
 })

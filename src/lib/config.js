@@ -1,3 +1,5 @@
+import { DEFAULT_IMAGE_REGISTRIES } from './constants.js'
+
 export const servicesNamespace = process.env.SERVICES_NAMESPACE || 'services'
 
 // M2M field on the `deployments` collection listing users with rights on
@@ -25,3 +27,17 @@ export const deploymentPublicStatuses = (
   .split(',')
   .map((status) => status.trim())
   .filter(Boolean)
+
+// Registries user containers may pull images from. Bare image names
+// ('pytorch/pytorch') imply docker.io. Comma-separated env override
+// replaces the default; set IMAGE_REGISTRY_ALLOWLIST='*' to disable the
+// restriction entirely.
+export const imageRegistryAllowlist = (() => {
+  const raw = process.env.IMAGE_REGISTRY_ALLOWLIST
+  if (raw == null) return DEFAULT_IMAGE_REGISTRIES
+  const registries = raw
+    .split(',')
+    .map((registry) => registry.trim().toLowerCase())
+    .filter(Boolean)
+  return registries.includes('*') ? null : registries
+})()

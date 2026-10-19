@@ -17,6 +17,9 @@ describe('makeStatefulSet', () => {
     expect(statefulSet.spec.template.metadata.labels).toEqual({
       app: 'sd-5',
     })
+    expect(statefulSet.spec.template.spec.automountServiceAccountToken).toBe(
+      false
+    )
     expect(statefulSet.spec.template.spec.nodeSelector).toEqual({
       'node-role.kubernetes.io/worker': 'worker',
     })

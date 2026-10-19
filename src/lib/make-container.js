@@ -12,6 +12,29 @@ export function makeContainer(c, servicePayloads, statefulSetName) {
   container.securityContext = new k8s.V1SecurityContext()
   container.securityContext.allowPrivilegeEscalation = false
 
+  // Seccomp: the containerd default profile blocks debug/profiling
+  // syscalls (strace, perf, ...) — `seccomp: false` opts a container out
+  if (c.seccomp !== false) {
+    container.securityContext.seccompProfile = new k8s.V1SeccompProfile()
+    container.securityContext.seccompProfile.type = 'RuntimeDefault'
+  }
+
+  // Capabilities: drop ALL, add back only what the user requests. The
+  // requestable set is the Docker/containerd default (ALLOWED_CAPABILITIES),
+  // validated in validate-container.js — so an image that ran on plain
+  // Docker keeps working, while nothing gains privileges it never had.
+  container.securityContext.capabilities = new k8s.V1Capabilities()
+  container.securityContext.capabilities.drop = ['ALL']
+  if (Array.isArray(c.capabilities) && c.capabilities.length) {
+    container.securityContext.capabilities.add = [...c.capabilities]
+  }
+
+  // Non-root by default: images whose entrypoint needs root can opt out
+  // with `runAsRoot: true` (visible in the YAML, easy to audit)
+  if (c.runAsRoot !== true) {
+    container.securityContext.runAsNonRoot = true
+  }
+
   if (typeof c.user === 'number') {
     container.securityContext.runAsUser = c.user
   }

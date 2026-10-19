@@ -71,3 +71,40 @@ export const NUMBER_UNITS = {
 
 // Maximum replicas allowed per deployment (also enforced for ?scale=)
 export const MAX_REPLICAS = 16
+
+// Registries user containers may pull images from by default (env:
+// IMAGE_REGISTRY_ALLOWLIST). nvcr.io for NVIDIA GPU container images;
+// mcr.microsoft.com for Microsoft's; a bare image name ('pytorch/pytorch')
+// implies docker.io.
+export const DEFAULT_IMAGE_REGISTRIES = [
+  'docker.io',
+  'ghcr.io',
+  'quay.io',
+  'nvcr.io',
+  'mcr.microsoft.com',
+  'registry.kitegg.de',
+  'registry.motionbank.org',
+]
+
+// Capabilities a user container may be granted beyond the default drop
+// of ALL. This is exactly the Docker/containerd default capability set,
+// so images that ran on plain Docker keep working — everything beyond
+// (SYS_ADMIN, ...) was never available by default either. make-container
+// always drops ALL and adds back only these, and only when the user
+// requests them via the container's `capabilities` field.
+export const ALLOWED_CAPABILITIES = [
+  'AUDIT_WRITE',
+  'CHOWN',
+  'DAC_OVERRIDE',
+  'FOWNER',
+  'FSETID',
+  'KILL',
+  'MKNOD',
+  'NET_BIND_SERVICE',
+  'NET_RAW',
+  'SETFCAP',
+  'SETGID',
+  'SETPCAP',
+  'SETUID',
+  'SYS_CHROOT',
+]

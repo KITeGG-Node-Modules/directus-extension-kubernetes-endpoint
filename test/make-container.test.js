@@ -45,6 +45,43 @@ describe('makeContainer', () => {
     expect(container.securityContext.runAsGroup).toBe(1000)
   })
 
+  it('hardens the security context by default', () => {
+    const container = makeContainer({ name: 'app', image: 'app' }, [])
+    expect(container.securityContext.runAsNonRoot).toBe(true)
+    expect(container.securityContext.allowPrivilegeEscalation).toBe(false)
+    expect(container.securityContext.seccompProfile.type).toBe('RuntimeDefault')
+    expect(container.securityContext.capabilities.drop).toEqual(['ALL'])
+    expect(container.securityContext.capabilities.add).toBeUndefined()
+  })
+
+  it('allows opting out of non-root and seccomp per container', () => {
+    const root = makeContainer(
+      { name: 'app', image: 'app', runAsRoot: true, seccomp: false },
+      []
+    )
+    expect(root.securityContext.runAsNonRoot).toBeUndefined()
+    expect(root.securityContext.seccompProfile).toBeUndefined()
+
+    // non-root and an explicit user are compatible
+    const user = makeContainer(
+      { name: 'app', image: 'app', user: 1000 },
+      []
+    )
+    expect(user.securityContext.runAsNonRoot).toBe(true)
+    expect(user.securityContext.runAsUser).toBe(1000)
+  })
+
+  it('adds requested capabilities on top of the drop of ALL', () => {
+    const container = makeContainer(
+      { name: 'app', image: 'app', capabilities: ['NET_BIND_SERVICE'] },
+      []
+    )
+    expect(container.securityContext.capabilities.drop).toEqual(['ALL'])
+    expect(container.securityContext.capabilities.add).toEqual([
+      'NET_BIND_SERVICE',
+    ])
+  })
+
   it('maps secret and config references', () => {
     const container = makeContainer(
       {

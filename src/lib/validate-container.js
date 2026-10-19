@@ -1,9 +1,66 @@
 import validate from 'validate.js'
-import { NUMBER_UNITS } from './constants.js'
+import { imageRegistryAllowlist } from './config.js'
+import { ALLOWED_CAPABILITIES, NUMBER_UNITS } from './constants.js'
 import { GPU_RESOURCE_NAMES } from './gpu-profiles.js'
 import { formatQuantity, parseQuantity } from './quantity.js'
 
 const GIB = 1024 ** 3
+
+/**
+ * The registry of a Docker image reference, lowercased. A leading path
+ * component counts as a registry host only when the reference has at
+ * least two path segments AND that component contains a dot or a colon
+ * or is `localhost` — so 'pytorch/pytorch' and 'nginx:latest' live on
+ * docker.io, while 'nvcr.io/nvidia/cuda' and 'my-reg.lan:5000/app'
+ * carry their own hosts. Digest references ('ubuntu@sha256:...') are
+ * handled before the ':' check, since the digest's colon is not a port.
+ */
+export function imageRegistry(image) {
+  if (typeof image !== 'string' || image === '') return null
+  const [reference] = image.split('@', 1)
+  const [firstSegment, secondSegment] = reference.split('/')
+  if (secondSegment === undefined) return 'docker.io'
+  const isRegistry =
+    firstSegment.includes('.') ||
+    firstSegment.includes(':') ||
+    firstSegment === 'localhost'
+  return (isRegistry ? firstSegment : 'docker.io').toLowerCase()
+}
+
+function validateImageRegistry(container, validationErrors) {
+  if (imageRegistryAllowlist == null) return validationErrors
+  const registry = imageRegistry(container.image)
+  if (registry == null) {
+    validationErrors.push({ image: ['must be an image reference'] })
+    return validationErrors
+  }
+  if (!imageRegistryAllowlist.includes(registry)) {
+    validationErrors.push({
+      image: [
+        `registry '${registry}' is not allowed — allowed registries: ${imageRegistryAllowlist.join(', ')}`,
+      ],
+    })
+  }
+  return validationErrors
+}
+
+function validateCapabilities(container, validationErrors) {
+  if (container.capabilities == null) return validationErrors
+  if (!Array.isArray(container.capabilities)) {
+    validationErrors.push({ capabilities: ['must be a list of capabilities'] })
+    return validationErrors
+  }
+  for (const capability of container.capabilities) {
+    if (!ALLOWED_CAPABILITIES.includes(capability)) {
+      validationErrors.push({
+        capabilities: [
+          `'${capability}' is not an allowed capability — allowed: ${ALLOWED_CAPABILITIES.join(', ')}`,
+        ],
+      })
+    }
+  }
+  return validationErrors
+}
 
 // Capacity values may be numbers (interpreted in NUMBER_UNITS) or
 // Kubernetes quantity strings ('500m', '2Gi'); both forms are
@@ -131,6 +188,15 @@ export function validateContainer(
     args: {
       type: 'array',
     },
+    runAsRoot: {
+      type: 'boolean',
+    },
+    seccomp: {
+      type: 'boolean',
+    },
+    capabilities: {
+      type: 'array',
+    },
   })
   if (containerErrors) {
     validationErrors = validationErrors.concat(containerErrors)
@@ -139,6 +205,8 @@ export function validateContainer(
 
   validateCpu(container, isManagement ? 256 : 32, validationErrors)
   validateMemory(container, isManagement ? 512 : 128, validationErrors)
+  validateImageRegistry(container, validationErrors)
+  validateCapabilities(container, validationErrors)
   if (validationErrors.length) return validationErrors
 
   if (Array.isArray(container.ports)) {
