@@ -6,6 +6,8 @@ const { client } = vi.hoisted(() => ({
     deleteNamespacedStatefulSet: vi.fn(),
     listNamespacedService: vi.fn(),
     deleteNamespacedService: vi.fn(),
+    listNamespacedNetworkPolicy: vi.fn(),
+    deleteNamespacedNetworkPolicy: vi.fn(),
     listNamespacedPersistentVolumeClaim: vi.fn(),
     deleteNamespacedPersistentVolumeClaim: vi.fn(),
     listNamespacedSecret: vi.fn(),
@@ -24,6 +26,9 @@ describe('deleteDeployment', () => {
     vi.clearAllMocks()
     client.deleteNamespacedStatefulSet.mockResolvedValue({})
     client.listNamespacedService.mockResolvedValue({ body: { items: [] } })
+    client.listNamespacedNetworkPolicy.mockResolvedValue({
+      body: { items: [] },
+    })
     client.listNamespacedSecret.mockResolvedValue({ body: { items: [] } })
     client.listNamespacedConfigMap.mockResolvedValue({ body: { items: [] } })
     client.listNamespacedPersistentVolumeClaim.mockResolvedValue({

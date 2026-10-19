@@ -14,13 +14,24 @@ describe('makeStatefulSet', () => {
     expect(statefulSet.spec.replicas).toBe(1)
     expect(statefulSet.spec.serviceName).toBe('sd-5')
     expect(statefulSet.spec.selector.matchLabels).toEqual({ app: 'sd-5' })
-    expect(statefulSet.spec.template.metadata.labels).toEqual({ app: 'sd-5' })
+    expect(statefulSet.spec.template.metadata.labels).toEqual({
+      app: 'sd-5',
+      'llp.kitegg.de/workload': 'true',
+    })
     expect(statefulSet.spec.template.spec.nodeSelector).toEqual({
       'node-role.kubernetes.io/worker': 'worker',
     })
     expect(servicePayloads).toEqual([
       { name: 'app', ports: [{ name: 'http', port: 80 }] },
     ])
+  })
+
+  it('stamps the workload label onto the pod template', () => {
+    const { statefulSet } = makeStatefulSet('sd-5', deployment)
+    expect(statefulSet.spec.template.metadata.labels).toEqual({
+      app: 'sd-5',
+      'llp.kitegg.de/workload': 'true',
+    })
   })
 
   it('uses a pod security context for filesystem ownership', () => {

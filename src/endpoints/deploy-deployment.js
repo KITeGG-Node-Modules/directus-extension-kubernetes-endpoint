@@ -3,13 +3,17 @@ import { createStatefulSet } from '../create-stateful-set.js'
 import { checkReservation } from '../lib/check-reservation.js'
 import { makeService } from '../lib/make-service.js'
 import { makeStatefulSet } from '../lib/make-stateful-set.js'
-import { isDeploymentOwner, loadDeployment } from '../lib/resolve-deployment.js'
+import {
+  isDeploymentOwner,
+  loadDeployment,
+} from '../lib/resolve-deployment.js'
 import {
   getDeploymentName,
   handleErrorResponse,
   parseDeploymentData,
 } from '../lib/util.js'
 import { validateDeployment } from '../lib/validate-deployment.js'
+import { syncOwnerGroup } from '../sync-network-policies.js'
 
 export async function deployDeployment(ctx) {
   const { req, res, user, userGroups, services } = ctx
@@ -51,6 +55,18 @@ export async function deployDeployment(ctx) {
     statefulSetName,
     deploymentData
   )
+  // Isolation resources are created before the stateful set so a
+  // deployment is never running without them (fail closed). If the
+  // extension's account lacks the networkpolicies RBAC (k8s/rbac.yaml),
+  // deploying fails with a 403. The whole owner group is synced: this
+  // deployment's policy needs its peers, and the peers' policies must
+  // start allowing this deployment (or stop allowing it after owner
+  // changes).
+  try {
+    await syncOwnerGroup(services, req.schema, deployment)
+  } catch (err) {
+    return handleErrorResponse(res, err)
+  }
   let created = false
   try {
     const statefulSetResult = await createStatefulSet(

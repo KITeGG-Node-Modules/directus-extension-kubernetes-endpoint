@@ -5,6 +5,44 @@ export const APP_LABEL_KEY = 'app'
 // Annotation used to force pod restarts on deployment updates
 export const RESTART_ANNOTATION_KEY = 'llp.kitegg.de/restartedAt'
 
+// Shared label marking every pod created by this extension as a user
+// workload. The static hardening policies in k8s/network-policy.yaml
+// select all user workloads by this label. NOT required for enforcement:
+// the per-deployment policies (make-network-policy.js) select pods by the
+// universal `app` label, so existing deployments are isolated without any
+// pod template change (which would trigger a rolling restart).
+export const WORKLOAD_LABEL_KEY = 'llp.kitegg.de/workload'
+export const WORKLOAD_LABEL_VALUE = 'true'
+
+// Ingress sources allowed to reach PUBLIC deployments, matching the
+// sources documented in k8s/network-policy.yaml:
+// - the Traefik ingress controller namespace (direct IngressRoutes), and
+// - the oauth2-proxy pods fronting *.service.kitegg.hs-mainz.de, running
+//   in the services namespace itself (verified pod label: app: service-proxy)
+export const INGRESS_NAMESPACE = 'traefik-v2'
+export const INGRESS_PROXY_POD_LABELS = { app: 'service-proxy' }
+
+// Additional namespaces whose pods may reach PUBLIC deployments on their
+// declared service ports — the JupyterHub hub and user notebooks connect
+// to published user services directly. Draft/restricted deployments stay
+// unreachable from these namespaces.
+export const INGRESS_EXTRA_NAMESPACES = ['jupyterhub']
+
+// `app` label values of the system-internal services sharing the services
+// namespace. Used to exclude them from the "any user pod" selectors (as an
+// ingress source and as an egress destination) — user workloads must not
+// reach them. MAINTENANCE: when a new system-internal service is added to
+// the namespace, add its app label value here and re-run the backfill
+// endpoint so the per-deployment policies are regenerated.
+export const SYSTEM_APP_LABEL_VALUES = [
+  'cache',
+  'nginx',
+  'openwebui',
+  'openwebui-ccl',
+  'service-proxy',
+  'tty-server',
+]
+
 // Directus collections accessed by this endpoint
 export const COLLECTIONS = {
   deployments: 'deployments',

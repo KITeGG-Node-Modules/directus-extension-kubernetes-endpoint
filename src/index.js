@@ -1,4 +1,5 @@
 import { baseRequestHandler } from 'kitegg-directus-extension-common'
+import { backfillNetworkPoliciesRoute } from './endpoints/backfill-network-policies.js'
 import { getCapacity } from './endpoints/capacity.js'
 import { getDeployment } from './endpoints/get-deployment.js'
 import { getDeploymentsState } from './endpoints/get-deployments-state.js'
@@ -18,6 +19,11 @@ export default {
   id: 'kubernetes',
   handler: (router, context) => {
     router.get('/capacity', baseRequestHandler(getCapacity, context))
+
+    router.post(
+      '/network-policies/backfill',
+      baseRequestHandler(backfillNetworkPoliciesRoute, context)
+    )
 
     router.get('/deployments/:id', baseRequestHandler(getDeployment, context))
 

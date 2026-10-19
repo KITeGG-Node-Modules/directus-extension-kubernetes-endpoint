@@ -97,6 +97,10 @@ export async function deleteDeployment(deployment) {
   const statefulSetName = getDeploymentName(deployment.id)
   const appsClient = getKubernetesClient(servicesNamespace, k8s.AppsV1Api)
   const coreClient = getKubernetesClient(servicesNamespace)
+  const networkingClient = getKubernetesClient(
+    servicesNamespace,
+    k8s.NetworkingV1Api
+  )
   const labelSelector = `${APP_LABEL_KEY}=${statefulSetName}`
   const errors = []
 
@@ -123,6 +127,14 @@ export async function deleteDeployment(deployment) {
     coreClient,
     'listNamespacedService',
     'deleteNamespacedService',
+    labelSelector,
+    errors
+  )
+  // The per-deployment ingress NetworkPolicy; carries the deployment label
+  await deleteLabeledResources(
+    networkingClient,
+    'listNamespacedNetworkPolicy',
+    'deleteNamespacedNetworkPolicy',
     labelSelector,
     errors
   )

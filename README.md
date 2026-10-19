@@ -46,6 +46,7 @@ Required verbs per resource (within the services namespace):
 | `apps/statefulsets`       | `get`, `list`, `create`, `update`, `patch`, `delete` | deploy, re-deploy (`update`), restart hook (`patch`), state/info, delete |
 | `apps/statefulsets/scale` | `update`, `patch`                                    | scaling (`PATCH /deployments/:id?scale=…`)                               |
 | `services`                | `get`, `create`, `patch`                             | deploy (ports of an existing service are patched)                        |
+| `networking.k8s.io/networkpolicies` | `get`, `list`, `create`, `update`, `delete` | deploy (per-deployment ingress policy), delete                           |
 | `configmaps`              | `get`, `create`, `update`, `delete`                  | config endpoints, delete                                                 |
 | `secrets`                 | `get`, `create`, `update`, `delete`                  | secret endpoints, delete                                                 |
 | `persistentvolumeclaims`  | `list`, `delete`                                     | deployment info, delete                                                  |
@@ -63,6 +64,91 @@ Required verbs per resource (within the services namespace):
 Additionally, `GET /kubernetes/capacity` reads cluster-scoped resources
 (nodes and pods across all namespaces) and needs a `ClusterRole` (included
 in `k8s/rbac.yaml`).
+
+### Network isolation
+
+Deployed services are the least trusted workloads in the cluster. Isolation
+is enforced by per-deployment NetworkPolicies that the extension creates
+for every deployment (requires a CNI that enforces NetworkPolicy — this
+cluster uses Calico). The policies select pods by the deployment's
+`app: sd-<id>` label, which is present on every pod — including those of
+deployments deployed before the isolation rollout. Applying the policies
+therefore never changes a pod template and never restarts anything.
+
+Each deployment's policy enforces:
+
+- **Ingress:**
+  - replicas of the deployment itself (any port),
+  - **deployments of the same owners** (`user_created` / `authors`), on the
+    deployment's **declared service ports** only,
+  - **public deployments** additionally: the ingress path (Traefik in
+    `traefik-v2` for direct routes, and the oauth2-proxy `service-proxy`
+    pods fronting `*.service.kitegg.hs-mainz.de`), pods in the extra
+    ingress namespaces (`INGRESS_EXTRA_NAMESPACES`, default `jupyterhub`
+    — the hub and user notebooks reach published services directly), and
+    other user deployments — also on the declared ports only.
+- **Egress:** DNS, other user deployments' pods, and the public internet.
+  System-internal services in the namespace (`cache`, `nginx`,
+  `openwebui*`, `service-proxy`, `tty-server`), pods and services of any
+  other namespace, node networks and the Kubernetes API are unreachable —
+  including the public control-plane addresses (`134.93.175.62/.63`),
+  which are blocked explicitly.
+
+Which deployments are public is decided by the Directus `status` field of
+the `deployments` collection: every status listed in
+`DEPLOYMENT_PUBLIC_STATUSES` (default `published`) is publicly reachable;
+everything else — `draft`, restricted states, and deployments without a
+status — can only be reached by deployments of the same owners. Same-owner
+deployments connect via the headless service
+`sd-<id>.services.svc.cluster.local`, which resolves to the pod IPs
+(ClusterIPs are unreachable by the egress rules). Undeclared ports (admin
+interfaces, debug endpoints) are never reachable from outside the
+deployment's replicas.
+
+The owner group's policies are regenerated automatically whenever a
+deployment is deployed or deleted; the static hardening layer below and
+the per-deployment policies never require contacting users or re-deploying
+existing deployments.
+
+**Static hardening layer** ([`k8s/network-policy.yaml`](k8s/network-policy.yaml),
+applied once by a cluster administrator): a second, admin-owned line of
+defense for every pod carrying the shared workload label
+`llp.kitegg.de/workload: "true"` — ingress default-deny and the same
+egress guardrails. If the extension's account were compromised, its
+per-deployment policies could be rewritten; these policies could not.
+
+**Rollout / migration** (no user interaction, no interruptions — policies
+are applied without touching any pod):
+
+1. Apply `k8s/rbac.yaml` (adds `networkpolicies` verbs) and deploy the new
+   extension version.
+2. Run the backfill as an administrator — it creates the per-deployment
+   policy and headless service for every existing deployment and is
+   idempotent:
+
+   ```sh
+   curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
+     https://<directus>/kubernetes/network-policies/backfill
+   ```
+
+3. Apply the static hardening manifest:
+
+   ```sh
+   kubectl apply -f k8s/rbac.yaml
+   kubectl apply -f k8s/network-policy.yaml
+   ```
+
+4. Verify, e.g.:
+
+   ```sh
+   kubectl get networkpolicies -n services | head
+   kubectl get pods -n services -o wide   # all still running
+   ```
+
+Maintenance: when a new system-internal service is added to the `services`
+namespace, add its `app` label value to `SYSTEM_APP_LABEL_VALUES`
+(`src/lib/constants.js`), redeploy the extension, and re-run the backfill
+— otherwise user workloads may reach it.
 
 To verify what the extension's account may do, run against the same cluster
 and token:
@@ -93,6 +179,12 @@ The required payload for the service is:
 
 The values for `exposed_service`, `exposed_port` and `exposed_hostname` (must be a unique, alphanumeric string allowing
 only a dash as a special character) are optional and refer to the values in the YAML below.
+
+The deployment's Directus `status` decides its network visibility (see
+[Network isolation](#network-isolation)): deployments with status
+`published` are reachable from the ingress path on their declared service
+ports; all other states (e.g. `draft`) are only reachable by deployments of
+the same owners.
 
 The YAML describing the deployment is structured as follows:
 

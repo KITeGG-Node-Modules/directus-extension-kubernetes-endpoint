@@ -1,0 +1,141 @@
+# Cluster-level network hardening for user-deployed workloads
+# (KITeGG Kubernetes endpoint).
+#
+# ROLE: this manifest is a HARDENING layer, not the primary enforcement.
+# The primary isolation comes from per-deployment NetworkPolicies that the
+# extension creates for EVERY deployment (selected by the deployment's
+# `app: sd-<id>` label — a label present on all pods, existing ones
+# included, so no pod template change and no restart is ever needed):
+#
+#   - Ingress: denied except the deployment's own replicas, deployments of
+#     the same owners, and (for public deployments) the ingress path, the
+#     `jupyterhub` namespace, and other user deployments — always
+#     restricted to the declared service ports.
+#   - Egress: DNS, other user deployments' pods, and the public internet.
+#     System-internal services, other namespaces, node networks and the
+#     Kubernetes API are unreachable.
+#
+# THIS manifest adds a second, admin-owned line of defense for every pod
+# carrying the shared workload label `llp.kitegg.de/workload: "true"`
+# (stamped on all pod templates since the isolation rollout). If the
+# extension's account were compromised, the per-deployment policies could
+# be rewritten — these policies could not (the extension's RBAC grants
+# networkpolicies only within the services namespace, and this manifest is
+# applied and owned by cluster admins). Deployments whose pods do not yet
+# carry the workload label (created before the rollout) are still fully
+# isolated by their per-deployment policies.
+#
+# Cluster facts these values are based on (see the jupyterhub repo):
+#   - kubeadm, pod CIDR 192.168.0.0/16, service CIDR 10.96.0.0/12
+#     (verified: kubernetes ClusterIP 10.96.0.1)
+#   - Calico via tigera-operator -> NetworkPolicy IS enforced
+#   - nodes on 10.10.10.0/24, control-plane endpoint
+#     hsm-kitegg-a/b.zdv.uni-mainz.de resolves PUBLICLY to
+#     134.93.175.62 / 134.93.175.63
+#   - ingress: Traefik (LoadBalancer) in namespace `traefik-v2`, the
+#     oauth2-proxy "service-proxy" pods (app: service-proxy) in the
+#     services namespace, and the `jupyterhub` namespace for published
+#     user services
+#   - DNS: CoreDNS pods (k8s-app: kube-dns) in kube-system
+#
+# Rollout (see README "Network isolation"): apply k8s/rbac.yaml, deploy the
+# new extension version, run the backfill endpoint
+# (POST /kubernetes/network-policies/backfill, admin token) to create the
+# per-deployment policies of all existing deployments, THEN apply this
+# manifest. Because the per-deployment policies already provide the full
+# isolation, this application cannot interrupt anything.
+#
+# Double-check the CIDRs against the live cluster before applying:
+#   kubectl cluster-info dump | grep -m1 -- --service-cluster-ip-range
+#   kubectl get nodes -o jsonpath='{.items[*].spec.podCIDR}'
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: user-workloads-default-deny-ingress
+  namespace: services
+spec:
+  podSelector:
+    matchLabels:
+      llp.kitegg.de/workload: "true"
+  policyTypes:
+    - Ingress
+  # No ingress rules: everything is denied unless a per-deployment policy
+  # (created by the extension) allows it.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: user-workloads-egress
+  namespace: services
+spec:
+  podSelector:
+    matchLabels:
+      llp.kitegg.de/workload: "true"
+  policyTypes:
+    - Egress
+  egress:
+    # DNS: CoreDNS in kube-system (kubeadm default)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Other user deployments' pods (system-internal services excluded).
+    # WHO may connect is enforced by the target's per-deployment ingress
+    # policy; cross-deployment clients use the headless service
+    # `sd-<id>.services.svc.cluster.local`. MAINTENANCE: keep this list in
+    # sync with SYSTEM_APP_LABEL_VALUES in the extension.
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: app
+                operator: Exists
+              - key: app
+                operator: NotIn
+                values:
+                  - cache
+                  - nginx
+                  - openwebui
+                  - openwebui-ccl
+                  - service-proxy
+                  - tty-server
+    # Internet. Everything cluster-internal is cut off via `except`:
+    #   - 192.168.0.0/16   -> pod CIDR: all pods, all namespaces (incl.
+    #                          the `services` namespace itself); also
+    #                          covers the RFC1918 192.168/16 private range
+    #   - 10.96.0.0/12     -> service CIDR: all ClusterIPs, incl. the
+    #                          `kubernetes` API service
+    #   - 10.10.10.0/24    -> node network (kubelet, control plane
+    #                          advertise addresses 10.10.10.1/.3)
+    #   - RFC1918          -> any other private ranges routed from the
+    #                          nodes (incl. the rest of 10.0.0.0/8,
+    #                          172.16/12)
+    #   - 169.254.0.0/16   -> link-local, notably the cloud metadata
+    #                          service 169.254.169.254 (SSRF target)
+    #   - 100.64.0.0/10    -> shared address space (encap IPs on some
+    #                          CNIs and cloud providers)
+    #   - 134.93.175.62/32, .63/32 -> PUBLIC control-plane addresses
+    #                          (hsm-kitegg-a/b.zdv.uni-mainz.de); without
+    #                          these the pods could reach the Kubernetes
+    #                          API over the internet
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 192.168.0.0/16
+              - 10.96.0.0/12
+              - 10.10.10.0/24
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 169.254.0.0/16
+              - 100.64.0.0/10
+              - 134.93.175.62/32
+              - 134.93.175.63/32

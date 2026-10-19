@@ -1,9 +1,12 @@
 import k8s from '@kubernetes/client-node'
 import { servicesNamespace } from './config.js'
 import {
+  APP_LABEL_KEY,
   NODE_SELECTOR,
   NUMBER_UNITS,
   RESTART_ANNOTATION_KEY,
+  WORKLOAD_LABEL_KEY,
+  WORKLOAD_LABEL_VALUE,
 } from './constants.js'
 import { makeVolumeClaim } from './make-volume-claim.js'
 import { makeContainer } from './make-container.js'
@@ -31,7 +34,11 @@ export function makeStatefulSet(name, deployment) {
   const podTemplateSpec = new k8s.V1PodTemplateSpec()
   podTemplateSpec.metadata = new k8s.V1ObjectMeta()
   podTemplateSpec.metadata.labels = {
-    app: name,
+    [APP_LABEL_KEY]: name,
+    // Marks the pod as a user workload for the static hardening policies
+    // (k8s/network-policy.yaml). Enforcement does not depend on it: the
+    // per-deployment policies select pods by the `app` label.
+    [WORKLOAD_LABEL_KEY]: WORKLOAD_LABEL_VALUE,
   }
   podTemplateSpec.metadata.annotations = {
     [RESTART_ANNOTATION_KEY]: new Date().toISOString(),

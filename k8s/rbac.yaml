@@ -27,6 +27,11 @@ rules:
   - apiGroups: ['']
     resources: ['services']
     verbs: ['get', 'list', 'create', 'patch']
+  # Per-deployment ingress NetworkPolicy (created before the stateful set,
+  # replaced on re-deploy, deleted with the deployment)
+  - apiGroups: ['networking.k8s.io']
+    resources: ['networkpolicies']
+    verbs: ['get', 'list', 'create', 'update', 'delete']
   # PUT/GET config and secret; delete removes them with the deployment
   - apiGroups: ['']
     resources: ['configmaps', 'secrets']

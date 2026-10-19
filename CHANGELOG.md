@@ -8,6 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Network isolation for user deployments via per-deployment NetworkPolicies, created and replaced with every deploy and selected by the deployment's `app` label, so existing deployments are isolated without any pod template change and without restarting anything
+- Ingress rules per deployment: replicas may talk to each other on any port; deployments of the same owners (`user_created` / `authors`) and — for public deployments — the ingress path (Traefik, the oauth2-proxy `service-proxy`), the extra ingress namespaces (`INGRESS_EXTRA_NAMESPACES`, default `jupyterhub`) and other user deployments may connect on the deployment's declared service ports only
+- Egress rules per deployment: DNS, other user deployments' pods and the public internet only; the cluster-internal ranges (pods and services of any namespace, node networks) and the Kubernetes API — including its public control-plane addresses — are blocked explicitly
+- Headless service per deployment (`sd-<id>`), backing cross-deployment DNS (`sd-<id>.services.svc.cluster.local` resolves to the pod IPs) and the StatefulSet's `serviceName`
+- `POST /network-policies/backfill` admin endpoint: idempotently creates or updates the isolation resources (NetworkPolicy + headless service) of every deployment without touching any pod, used for the zero-downtime migration of existing deployments and after changing `SYSTEM_APP_LABEL_VALUES`
+- Cluster-level hardening manifest `k8s/network-policy.yaml` (admin-owned second line of defense: ingress default-deny and the same egress guardrails for pods carrying the shared workload label), pre-filled with the cluster's verified CIDRs
+- `networkpolicies` RBAC for the extension's account in `k8s/rbac.yaml`
+- Configuration: `DEPLOYMENT_PUBLIC_STATUSES` (deployment statuses that are publicly reachable, default `published`) and `INGRESS_EXTRA_NAMESPACES` (namespaces whose pods may reach public deployments, default `jupyterhub`)
 - `GET /deployments-running` endpoint listing the ids of deployments that currently have pods in the Running state
 - Deployment ownership enforcement on all mutating endpoints: non-admin users can only scale, restart, delete, or change the secret and config of deployments they own. Ownership derives from the deployment's `user_created`, `user_updated` and `authors` fields; `DEPLOYMENT_AUTHORS_FIELD` configures the authors list (an empty value disables that source) and `ENFORCE_DEPLOYMENT_OWNERSHIP=false` disables the check entirely
 - Required Kubernetes RBAC documented, with a ready-to-apply `k8s/rbac.yaml` manifest
@@ -42,3 +50,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Security
 
 - Pod logs, events and deletion are restricted to pods belonging to the deployment itself
+- User workloads are network-isolated: they cannot reach system-internal services sharing the services namespace, pods or services of any other namespace, node networks, or the Kubernetes API; draft/restricted deployments are only reachable by deployments of the same owners, and public deployments only on their declared service ports
