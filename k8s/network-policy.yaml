@@ -35,7 +35,11 @@
 #   - ingress: Traefik (LoadBalancer) in namespace `traefik-v2`, the
 #     oauth2-proxy "service-proxy" pods (app: service-proxy) in the
 #     services namespace, and the `jupyterhub` namespace for published
-#     user services
+#     user services. The wildcard domain has a second entry point — the
+#     NGINX TLS proxy (NodePort :30443) forwarding to the same
+#     service-proxy pods — which needs no rule of its own: neither NGINX
+#     nor the service-proxy are policy-selected, and the hop into user
+#     pods always originates from the service-proxy pods.
 #   - DNS: CoreDNS pods (k8s-app: kube-dns) in kube-system
 #
 # Rollout (see README "Network isolation"): apply k8s/rbac.yaml, deploy the

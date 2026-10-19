@@ -87,6 +87,18 @@ Each deployment's policy enforces:
     ingress namespaces (`INGRESS_EXTRA_NAMESPACES`, default `jupyterhub`
     — the hub and user notebooks reach published services directly), and
     other user deployments — also on the declared ports only.
+  - A restricted deployment that has a published port (`exposed_service` /
+    `exposed_port`) stays reachable by the ingress path on that port only
+    (e.g. to preview a draft via its published hostname).
+
+  The wildcard domain has TWO entry points, and both work unchanged: the
+  Traefik route above, and the NGINX TLS proxy (NodePort `:30443`, TLS
+  termination) which forwards to the same `service-proxy` pods. Neither
+  NGINX nor the service-proxy are policy-selected, so their hops are
+  unrestricted; the only hop governed by policy is `service-proxy` → user
+  pod, which is the allowed ingress-path peer. If NGINX ever proxied to
+  user services directly (not via the service-proxy), it would need to be
+  added to that peer rule.
 - **Egress:** DNS, other user deployments' pods, and the public internet.
   System-internal services in the namespace (`cache`, `nginx`,
   `openwebui*`, `service-proxy`, `tty-server`), pods and services of any
@@ -98,12 +110,8 @@ Which deployments are public is decided by the Directus `status` field of
 the `deployments` collection: every status listed in
 `DEPLOYMENT_PUBLIC_STATUSES` (default `published`) is publicly reachable;
 everything else — `draft`, restricted states, and deployments without a
-status — can only be reached by deployments of the same owners. A
-restricted deployment that has a published port (`exposed_service` /
-`exposed_port`) remains reachable by the ingress path (Traefik and the
-oauth2-proxy `service-proxy`) on that port only — e.g. to preview a draft
-via its published hostname — but not from other users' deployments or the
-extra ingress namespaces. Same-owner deployments connect via the headless
+status — can only be reached by deployments of the same owners. Same-owner
+deployments connect via the headless
 service `sd-<id>.services.svc.cluster.local`, which resolves to the pod
 IPs (ClusterIPs are unreachable by the egress rules). Undeclared ports
 (admin interfaces, debug endpoints) are never reachable from outside the
@@ -148,6 +156,21 @@ are applied without touching any pod):
    kubectl get networkpolicies -n services | head
    kubectl get pods -n services -o wide   # all still running
    ```
+
+   Then smoke-test every ingress entry point against a published
+   deployment's hostname (`*.service.kitegg.hs-mainz.de`), from outside
+   the cluster:
+
+   ```sh
+   # via Traefik
+   curl -I https://<name>.service.kitegg.hs-mainz.de
+   # via the NGINX TLS proxy (NodePort)
+   curl -I --resolve <name>.service.kitegg.hs-mainz.de:30443:<node-ip> \
+     https://<name>.service.kitegg.hs-mainz.de:30443
+   ```
+
+   Both must answer (an auth redirect counts), and a draft deployment
+   without a published port must time out instead.
 
 Maintenance: when a new system-internal service is added to the `services`
 namespace, add its `app` label value to `SYSTEM_APP_LABEL_VALUES`
