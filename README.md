@@ -209,9 +209,11 @@ namespace, add its `app` label value to `SYSTEM_APP_LABEL_VALUES`
 independently of the extension):
 
 1. [`k8s/pod-security.yaml`](k8s/pod-security.yaml) — Pod Security
-   Admission on the namespace. Stage it: `warn`/`audit: baseline` first,
-   watch for warnings, then uncomment `enforce: baseline`. Verified: no
-   current workload template violates baseline.
+   Admission on the namespace. Stage it: apply with
+   `warn`/`audit: baseline`, check the stored-template scan from the
+   manifest header stays empty, then uncomment `enforce: baseline`.
+   (Audit-mode annotations land in the API server audit log, which this
+   cluster does not run — the header documents the practical check.)
 2. [`k8s/resource-quota.yaml`](k8s/resource-quota.yaml) — ResourceQuota
    + LimitRange bounding the namespace's total compute (sized at ~+50%
    over the measured ceiling) and object counts. The LimitRange is

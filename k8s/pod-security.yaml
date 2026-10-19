@@ -11,18 +11,29 @@
 # hostPorts, SYS_ADMIN caps) — `baseline` is safe to enforce.
 #
 # STAGED ROLLOUT (reversible at every step, affects only NEW pods):
-#   1. Apply this file as-is: `warn` (visible warning on create) and
-#      `audit` (annotation on violations) are active, `enforce` is
-#      commented out. Existing pods are never affected by PSA.
-#   2. Watch for warnings: kubectl get events -n services
-#      and run a deploy of every deployment shape you care about.
-#   3. After a quiet period, uncomment `enforce: baseline` and re-apply.
+#   1. Apply this file as-is: `warn` and `audit` are active, `enforce`
+#      is commented out. Existing pods are never affected by PSA.
+#   2. IMPORTANT (verified on this cluster): audit-mode results are
+#      annotations on the API-server AUDIT LOG event — this cluster has
+#      no audit policy configured, so audit mode is a no-op here. The
+#      `warn` output is only visible to the client that performs the
+#      create, and users deploy through the extension, which drops API
+#      response warnings. The practical staging check is therefore a
+#      scan over the STORED workload templates (empty output = nothing
+#      would violate enforce):
 #
-# NOTE: in the warn/audit phase violations are NOT rejected — a
-# violating pod is created and prints a `Warning: would violate
-# PodSecurity "baseline"` on creation (audit mode's annotation is
-# stamped only when ENFORCE is active alongside audit, not in
-# audit-only mode). The warning text is the signal to watch for.
+#        kubectl get sts,deploy -n services -o json | jq -r '
+#          .items[] | .kind as $k | .metadata.name as $n | (.spec.template.spec) |
+#          (if .hostNetwork or .hostPID or .hostIPC then "\($k)/\($n): host namespaces" else empty end),
+#          ((.volumes // [])[]? | select(.hostPath) | "\($k)/\($n): hostPath \(.name)"),
+#          (.containers[]? | select(.securityContext.privileged == true) | "\($k)/\($n): privileged \(.name)"),
+#          (.containers[]? | ((.ports // [])[]? | select(.hostPort) | "\($k)/\($n): hostPort \(.name)"))'
+#
+#   3. When the scan stays empty (the extension's whitelist builder
+#      cannot produce violating templates anyway), uncomment
+#      `enforce: baseline` and re-apply. From then on, violations are
+#      rejected at admission — visible as a clear PSA error in the
+#      extension's deploy error response.
 #
 # `restricted` would likely reject legitimate ML images (writable root
 # filesystems); it is deliberately NOT set for enforce. If you want its
