@@ -18,6 +18,12 @@
 #      and run a deploy of every deployment shape you care about.
 #   3. After a quiet period, uncomment `enforce: baseline` and re-apply.
 #
+# NOTE: in the warn/audit phase violations are NOT rejected — a
+# violating pod is created and prints a `Warning: would violate
+# PodSecurity "baseline"` on creation (audit mode's annotation is
+# stamped only when ENFORCE is active alongside audit, not in
+# audit-only mode). The warning text is the signal to watch for.
+#
 # `restricted` would likely reject legitimate ML images (writable root
 # filesystems); it is deliberately NOT set for enforce. If you want its
 # signal, add `pod-security.kubernetes.io/audit: restricted`.

@@ -22,6 +22,13 @@
 #     requests == limits), and a `requests.*` quota rejects pods without
 #     requests. The LimitRange defaults fill those in at admission
 #     (pods with explicit values are untouched).
+#   - DO NOT set `max` (or any GPU entry) for extended resources in the
+#     LimitRange: the API server auto-fills `default`/`defaultRequest`
+#     from `max` for extended resources, which would silently inject a
+#     GPU request into EVERY container that declares none — exhausting
+#     the GPU quota and allocating real GPUs to non-GPU workloads. The
+#     per-container GPU bound is enforced by the extension's deploy
+#     validation instead (max 2 per container, 8 for management users).
 #   - User workloads are additionally scheduled onto dedicated worker
 #     nodes (NODE_SELECTOR) — the quota bounds the aggregate, the node
 #     selector bounds the placement.
@@ -64,7 +71,4 @@ spec:
       default:
         cpu: '4'
         memory: 32Gi
-      # Mirrors the extension's own GPU bound (management users may
-      # request up to 8 GPUs per container)
-      max:
-        nvidia.com/gpu: '8'
+      # Deliberately NO nvidia.com/gpu entry here — see CAVEATS above
