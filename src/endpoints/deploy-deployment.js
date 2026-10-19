@@ -1,5 +1,6 @@
 import { createService } from '../create-service.js'
 import { createStatefulSet } from '../create-stateful-set.js'
+import { deleteUnreadyStatefulSetPods } from '../delete-unready-stateful-set-pods.js'
 import { checkReservation } from '../lib/check-reservation.js'
 import { makeService } from '../lib/make-service.js'
 import { makeStatefulSet } from '../lib/make-stateful-set.js'
@@ -84,6 +85,20 @@ export async function deployDeployment(ctx) {
     try {
       const serviceResult = await createService(service, serviceName)
       created = created || serviceResult.created
+    } catch (err) {
+      return handleErrorResponse(res, err)
+    }
+  }
+
+  if (!created) {
+    // The StatefulSet already existed: its pods must pick up the new
+    // template. The controller's OrderedReady rolling update never rolls a
+    // pod that never became Ready (CreateContainerConfigError,
+    // CrashLoopBackOff, Pending), so a re-deploy of a failing deployment
+    // would otherwise update the revision while the pod kept running the
+    // broken configuration forever
+    try {
+      await deleteUnreadyStatefulSetPods(statefulSetName)
     } catch (err) {
       return handleErrorResponse(res, err)
     }

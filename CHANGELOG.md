@@ -38,6 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Re-deploying a deployment whose pod never became Ready now actually reaches the pod: the StatefulSet controller's `OrderedReady` rolling update records the new revision but never rolls a pod stuck in `CreateContainerConfigError`, `CrashLoopBackOff` or `Pending` — the pod kept running the old template forever while every re-deploy looked like a no-op (no pod kill, no events). The deploy endpoint now deletes not-ready pods of an existing StatefulSet after the update, so the controller recreates them from the current template immediately; ready pods are left to the controller's normal rolling update
 - Kubernetes client cache returning the wrong API client after bundling
 - Extension build output to `dist/index.js`
 - Pod-level security context type
