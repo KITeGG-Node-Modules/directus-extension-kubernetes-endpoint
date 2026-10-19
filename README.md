@@ -410,6 +410,11 @@ PUT /kubernetes/deployments/<service ID>
 This should either return the deployment spec as JSON, or an error code with failed validation or other errors. To update
 the deployment config, just send another PUT request after updating the collection.
 
+Re-deploying updates the StatefulSet and rolls its pods. Note that the StatefulSet controller's rolling update never
+touches a pod that never became Ready (`CreateContainerConfigError`, `CrashLoopBackOff`, `Pending`) — it would keep
+running the old template forever. Re-deploying therefore also deletes that deployment's not-ready pods so the controller
+recreates them from the new template immediately; pods that are Ready keep the controller's normal rolling update.
+
 ### Querying a deployment status
 
 After a successful deployment, the service takes a moment to pull images, create volumes, etc. You can get the service
