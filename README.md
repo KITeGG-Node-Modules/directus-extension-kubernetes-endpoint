@@ -98,11 +98,15 @@ Which deployments are public is decided by the Directus `status` field of
 the `deployments` collection: every status listed in
 `DEPLOYMENT_PUBLIC_STATUSES` (default `published`) is publicly reachable;
 everything else — `draft`, restricted states, and deployments without a
-status — can only be reached by deployments of the same owners. Same-owner
-deployments connect via the headless service
-`sd-<id>.services.svc.cluster.local`, which resolves to the pod IPs
-(ClusterIPs are unreachable by the egress rules). Undeclared ports (admin
-interfaces, debug endpoints) are never reachable from outside the
+status — can only be reached by deployments of the same owners. A
+restricted deployment that has a published port (`exposed_service` /
+`exposed_port`) remains reachable by the ingress path (Traefik and the
+oauth2-proxy `service-proxy`) on that port only — e.g. to preview a draft
+via its published hostname — but not from other users' deployments or the
+extra ingress namespaces. Same-owner deployments connect via the headless
+service `sd-<id>.services.svc.cluster.local`, which resolves to the pod
+IPs (ClusterIPs are unreachable by the egress rules). Undeclared ports
+(admin interfaces, debug endpoints) are never reachable from outside the
 deployment's replicas.
 
 The owner group's policies are regenerated automatically whenever a

@@ -1,7 +1,11 @@
 import { COLLECTIONS } from './lib/constants.js'
 import { deploymentAuthorsField } from './lib/config.js'
 import { peerDeploymentNames } from './lib/deployment-peers.js'
-import { declaredPorts, makeNetworkPolicy } from './lib/make-network-policy.js'
+import {
+  declaredPorts,
+  exposedPortsOf,
+  makeNetworkPolicy,
+} from './lib/make-network-policy.js'
 import { makeHeadlessService } from './lib/make-service.js'
 import {
   deploymentOwnerIds,
@@ -22,6 +26,8 @@ async function loadAllDeployments(services, schema) {
     'id',
     'status',
     'data',
+    'exposed_service',
+    'exposed_port',
     'user_created.id',
     'user_updated.id',
   ]
@@ -36,19 +42,22 @@ async function loadAllDeployments(services, schema) {
 }
 
 /**
- * Declared service ports of a deployment item, parsed from its YAML data.
- * Unparseable data yields no port restrictions (the deployment must have
- * parsed to be deployed at all — this is a safety net, and it fails open
- * to avoid cutting off a running service).
+ * Declared and published service ports of a deployment item, parsed from
+ * its YAML data. Unparseable data yields no port restrictions (the
+ * deployment must have parsed to be deployed at all — this is a safety
+ * net, and it fails open to avoid cutting off a running service).
  */
 function portsOfDeployment(deployment) {
   try {
     const data = parse(deployment?.data)
-    return declaredPorts(
-      (data?.containers || []).map((c) => ({ name: c.name, ports: c.ports }))
-    )
+    return {
+      ports: declaredPorts(
+        (data?.containers || []).map((c) => ({ name: c.name, ports: c.ports }))
+      ),
+      exposedPorts: exposedPortsOf(deployment, data),
+    }
   } catch {
-    return []
+    return { ports: [], exposedPorts: [] }
   }
 }
 
@@ -69,10 +78,12 @@ export async function syncNetworkPolicies(services, schema, deployments, targets
   let headlessServices = 0
   for (const deployment of items) {
     const statefulSetName = getDeploymentName(deployment.id)
+    const { ports, exposedPorts } = portsOfDeployment(deployment)
     await createNetworkPolicy(
       makeNetworkPolicy(statefulSetName, {
         peerNames: peerDeploymentNames(deployments, deployment),
-        ports: portsOfDeployment(deployment),
+        ports,
+        exposedPorts,
         isPublic: isPublicDeployment(deployment),
       }),
       statefulSetName

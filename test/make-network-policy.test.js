@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   declaredPorts,
+  exposedPortsOf,
   makeNetworkPolicy,
 } from '../src/lib/make-network-policy.js'
 import { peerDeploymentNames } from '../src/lib/deployment-peers.js'
@@ -89,14 +90,18 @@ describe('makeNetworkPolicy', () => {
       ports,
       isPublic: true,
     })
+    // Separate rules: ingress path, then extra namespaces + user pods
+    const pathRule = policy.spec.ingress.at(-2)
     const publicRule = policy.spec.ingress.at(-1)
-    const [traefikPeer, proxyPeer, jupyterhubPeer, userPodsPeer] =
-      publicRule.from
+    const [traefikPeer, proxyPeer] = pathRule.from
     expect(traefikPeer.namespaceSelector.matchLabels).toEqual({
       'kubernetes.io/metadata.name': 'traefik-v2',
     })
     expect(traefikPeer.podSelector).toBeUndefined()
     expect(proxyPeer.podSelector.matchLabels).toEqual({ app: 'service-proxy' })
+    expect(pathRule.ports.map((port) => port.port)).toEqual([80, 8080])
+
+    const [jupyterhubPeer, userPodsPeer] = publicRule.from
     expect(jupyterhubPeer.namespaceSelector.matchLabels).toEqual({
       'kubernetes.io/metadata.name': 'jupyterhub',
     })
@@ -150,11 +155,91 @@ describe('makeNetworkPolicy', () => {
   })
 
   it('allows all ports when the deployment declares none', () => {
-    const policy = makeNetworkPolicy('sd-5', { peerNames: peers, isPublic: true })
+    const policy = makeNetworkPolicy('sd-5', {
+      peerNames: peers,
+      isPublic: true,
+    })
     const [, ...withoutSelf] = policy.spec.ingress
     for (const rule of withoutSelf) {
       expect(rule.ports).toBeUndefined()
     }
+  })
+})
+
+describe('exposedPortsOf', () => {
+  const data = {
+    containers: [
+      { name: 'app', ports: [{ name: 'http', port: 80 }, { name: 'admin', port: 9000 }] },
+      { name: 'sidecar', ports: [{ name: 'metrics', port: 9090 }] },
+    ],
+  }
+
+  it('resolves the published port of the exposed container by name', () => {
+    expect(
+      exposedPortsOf({ exposed_service: 'app', exposed_port: 'http' }, data)
+    ).toEqual([{ name: 'http', port: 80 }])
+  })
+
+  it('resolves by port number', () => {
+    expect(
+      exposedPortsOf({ exposed_service: 'app', exposed_port: 9000 }, data)
+    ).toEqual([{ name: 'admin', port: 9000 }])
+    // Also accepts a number as string
+    expect(
+      exposedPortsOf({ exposed_service: 'app', exposed_port: '9000' }, data)
+    ).toEqual([{ name: 'admin', port: 9000 }])
+  })
+
+  it('falls back to all ports of the exposed container when no port is given', () => {
+    expect(exposedPortsOf({ exposed_service: 'app' }, data)).toEqual([
+      { name: 'http', port: 80 },
+      { name: 'admin', port: 9000 },
+    ])
+  })
+
+  it('falls back to all containers when no service is given', () => {
+    expect(
+      exposedPortsOf({ exposed_port: 'metrics' }, data)
+    ).toEqual([{ name: 'metrics', port: 9090 }])
+  })
+
+  it('publishes nothing for unknown containers, ports or unset fields', () => {
+    expect(exposedPortsOf({ exposed_service: 'nope', exposed_port: 'http' }, data)).toEqual([])
+    expect(exposedPortsOf({ exposed_service: 'app', exposed_port: 'nope' }, data)).toEqual([])
+    expect(exposedPortsOf({}, data)).toEqual([])
+  })
+})
+
+describe('restricted deployments with a published port', () => {
+  it('lets the ingress path reach only the published port', () => {
+    const policy = makeNetworkPolicy('sd-5', {
+      ports: [{ name: 'http', port: 80 }, { name: 'admin', port: 9000 }],
+      exposedPorts: [{ name: 'admin', port: 9000 }],
+    })
+
+    // Ingress path rule exists, restricted to the exposed port
+    const pathRule = policy.spec.ingress.at(-1)
+    const [traefikPeer, proxyPeer] = pathRule.from
+    expect(traefikPeer.namespaceSelector.matchLabels).toEqual({
+      'kubernetes.io/metadata.name': 'traefik-v2',
+    })
+    expect(proxyPeer.podSelector.matchLabels).toEqual({ app: 'service-proxy' })
+    expect(pathRule.ports.map((port) => port.port)).toEqual([9000])
+
+    // No rule for other user deployments or the extra ingress namespaces
+    const sources = policy.spec.ingress.flatMap((rule) =>
+      (rule.from ?? []).map((peer) => peer.namespaceSelector?.matchLabels?.['kubernetes.io/metadata.name'] ?? null)
+    )
+    expect(sources).not.toContain('jupyterhub')
+  })
+
+  it('publishes nothing for restricted deployments without a published port', () => {
+    const policy = makeNetworkPolicy('sd-5', {
+      peerNames: [],
+      ports: [{ name: 'http', port: 80 }],
+    })
+    // Only the self rule
+    expect(policy.spec.ingress).toHaveLength(1)
   })
 })
 
