@@ -83,13 +83,16 @@ Each deployment's policy enforces:
     deployment's **declared service ports** only,
   - **public deployments** additionally: the ingress path (Traefik in
     `traefik-v2` for direct routes, and the oauth2-proxy `service-proxy`
-    pods fronting `*.service.kitegg.hs-mainz.de`), pods in the extra
+    pods fronting `*.service.kitegg.hs-mainz.de`), the Open WebUI
+    instances (`PUBLIC_INGRESS_SYSTEM_POD_LABELS`), pods in the extra
     ingress namespaces (`INGRESS_EXTRA_NAMESPACES`, default `jupyterhub`
     — the hub and user notebooks reach published services directly), and
     other user deployments — also on the declared ports only.
-  - A restricted deployment that has a published port (`exposed_service` /
-    `exposed_port`) stays reachable by the ingress path on that port only
-    (e.g. to preview a draft via its published hostname).
+  - A **published port** (`exposed_service` / `exposed_port`) is reachable
+    by the ingress path on that port only — for every deployment,
+    regardless of its visibility or access control (e.g. to preview a
+    draft via its published hostname). The Open WebUI instances can reach
+    it as well: the published port is the only requirement.
 
   The wildcard domain has TWO entry points, and both work unchanged: the
   Traefik route above, and the NGINX TLS proxy (NodePort `:30443`, TLS
@@ -117,17 +120,42 @@ IPs (ClusterIPs are unreachable by the egress rules). Undeclared ports
 (admin interfaces, debug endpoints) are never reachable from outside the
 deployment's replicas.
 
-The owner group's policies are regenerated automatically whenever a
-deployment is deployed or deleted; the static hardening layer below and
-the per-deployment policies never require contacting users or re-deploying
-existing deployments.
+**Keeping the policies in sync:** the policies are regenerated whenever a
+deployment is **deployed or deleted** via the extension endpoints, and —
+via the bundled Directus hook (`src/hooks/sync-deployments.js`) — whenever
+a `deployments` item is changed in Directus, so access-control edits are
+reflected without waiting for the next deploy:
+
+- `status` (publishing/unpublishing), `exposed_service` / `exposed_port`
+  (publishing a port), `user_created` / `authors` (owner changes —
+  removed authors lose access), and port changes in the deployment YAML
+  trigger a debounced sync of exactly the edited deployments (peer lists
+  are recomputed from the full collection; cross-deployment access is
+  decided target-side).
+- Deleting a deployment item directly in Directus (bypassing the
+  extension's DELETE endpoint) triggers a full sync so no peer rule
+  survives the deleted deployment.
+- A scheduled reconciliation (`*/10 * * * *`) runs a full sync as a
+  safety net for everything the item hooks cannot see — author changes
+  made directly on the M2M junction collection, out-of-band `kubectl`
+  edits, drift.
+- `POST /kubernetes/network-policies/backfill` remains the manual
+  fallback (e.g. after cluster restores or as part of the rollout).
+
+None of these paths require contacting users or re-deploying existing
+deployments — policies select pods by the universal `app` label and apply
+without touching a pod.
 
 **Static hardening layer** ([`k8s/network-policy.yaml`](k8s/network-policy.yaml),
 applied once by a cluster administrator): a second, admin-owned line of
-defense for every pod carrying the shared workload label
-`llp.kitegg.de/workload: "true"` — ingress default-deny and the same
-egress guardrails. If the extension's account were compromised, its
-per-deployment policies could be rewritten; these policies could not.
+defense selecting every pod in the namespace whose `app` label is not one
+of the system-internal services — i.e. exactly the user workloads,
+previously existing pods included (pods without an `app` label, such as
+the kuberay-operator with its `app.kubernetes.io/*` labels, are not
+selected). Ingress default-deny plus the same egress guardrails. If the
+extension's account were compromised, its per-deployment policies could
+be rewritten; these policies could not. MAINTENANCE: keep the manifest's
+`NotIn` list in sync with `SYSTEM_APP_LABEL_VALUES`.
 
 **Rollout / migration** (no user interaction, no interruptions — policies
 are applied without touching any pod):

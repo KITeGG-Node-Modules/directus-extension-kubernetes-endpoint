@@ -5,6 +5,7 @@ import {
   INGRESS_EXTRA_NAMESPACES,
   INGRESS_NAMESPACE,
   INGRESS_PROXY_POD_LABELS,
+  PUBLIC_INGRESS_SYSTEM_POD_LABELS,
   SYSTEM_APP_LABEL_VALUES,
 } from './constants.js'
 
@@ -53,8 +54,11 @@ const INTERNET_EXCEPT = [
  *   by their `app` label, on the deployment's declared service ports only,
  * - the ingress path (Traefik directly, and oauth2-proxy for
  *   *.service.kitegg.hs-mainz.de): for PUBLIC deployments on the declared
- *   service ports, and for restricted deployments that have a published
- *   port (`exposed_service` / `exposed_port`) on that port only,
+ *   service ports,
+ * - a published port (`exposed_service` / `exposed_port`) is reachable by
+ *   the ingress path AND by the Open WebUI instances regardless of the
+ *   deployment's visibility and access control — the published port is
+ *   the only requirement,
  * - PUBLIC deployments additionally from other user deployments and from
  *   the extra ingress namespaces (JupyterHub), on the declared service
  *   ports only.
@@ -100,19 +104,25 @@ export function makeNetworkPolicy(
   }
 
   // Ingress path (Traefik and oauth2-proxy): always allowed for public
-  // deployments (on all declared ports), and for restricted deployments
-  // that have a published port (exposed_service / exposed_port) — but
-  // only on that port. Drafts without a published port stay unreachable.
-  if (isPublic || exposedPorts.length) {
-    const traefikPeer = new k8s.V1NetworkPolicyPeer()
-    traefikPeer.namespaceSelector = new k8s.V1LabelSelector()
-    traefikPeer.namespaceSelector.matchLabels = {
-      'kubernetes.io/metadata.name': INGRESS_NAMESPACE,
-    }
+  // deployments (on all declared ports), and for ANY deployment that has
+  // a published port (exposed_service / exposed_port) — but only on that
+  // port, regardless of visibility. Drafts without a published port stay
+  // unreachable from the ingress path.
+  if (isPublic) {
+    ingress.push(makeIngressRule(ingressPathPeers(), ports))
+  }
+
+  // A published port is reachable by the ingress path and by the Open
+  // WebUI instances — independent of the deployment's visibility and
+  // access control: the published port is the only requirement.
+  if (exposedPorts.length) {
     ingress.push(
       makeIngressRule(
-        [traefikPeer, podPeer(INGRESS_PROXY_POD_LABELS)],
-        isPublic ? ports : exposedPorts
+        [
+          ...ingressPathPeers(),
+          ...PUBLIC_INGRESS_SYSTEM_POD_LABELS.map((labels) => podPeer(labels)),
+        ],
+        exposedPorts
       )
     )
   }
@@ -131,7 +141,11 @@ export function makeNetworkPolicy(
     })
     ingress.push(
       makeIngressRule(
-        [...extraNamespacePeers, anyUserPodPeer()],
+        [
+          ...extraNamespacePeers,
+          ...PUBLIC_INGRESS_SYSTEM_POD_LABELS.map((labels) => podPeer(labels)),
+          anyUserPodPeer(),
+        ],
         ports
       )
     )
@@ -213,6 +227,19 @@ function podPeer(matchLabels) {
   peer.podSelector = new k8s.V1LabelSelector()
   peer.podSelector.matchLabels = matchLabels
   return peer
+}
+
+// The ingress path: Traefik (for the direct routes) and the oauth2-proxy
+// `service-proxy` pods (fronting *.service.kitegg.hs-mainz.de; the NGINX
+// TLS proxy on NodePort :30443 forwards into these, needing no rule of
+// its own)
+function ingressPathPeers() {
+  const traefikPeer = new k8s.V1NetworkPolicyPeer()
+  traefikPeer.namespaceSelector = new k8s.V1LabelSelector()
+  traefikPeer.namespaceSelector.matchLabels = {
+    'kubernetes.io/metadata.name': INGRESS_NAMESPACE,
+  }
+  return [traefikPeer, podPeer(INGRESS_PROXY_POD_LABELS)]
 }
 
 function makeIngressRule(peers, ports) {

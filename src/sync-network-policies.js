@@ -127,6 +127,22 @@ function peerSharesOwner(item, deployment, ownerIds) {
 }
 
 /**
+ * Regenerate the isolation resources of the given deployment ids. Directus
+ * item edits (status, owners, published port, ports in the YAML) only ever
+ * affect the edited deployments' own policies: peer lists are recomputed
+ * from the full collection, and cross-deployment access is decided
+ * target-side — so syncing the changed items is sufficient.
+ */
+export async function syncDeploymentIds(services, schema, ids) {
+  const deployments = await loadAllDeployments(services, schema)
+  const wanted = new Set((ids ?? []).map((id) => String(id)))
+  const targets = deployments.filter((deployment) =>
+    wanted.has(String(deployment.id))
+  )
+  return syncNetworkPolicies(services, schema, deployments, targets)
+}
+
+/**
  * Backfill the isolation resources of EVERY deployment. Idempotent and
  * safe to re-run; used to migrate existing deployments without touching
  * their pods (no restarts). Intended for administrators via the backfill

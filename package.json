@@ -13,9 +13,23 @@
 	],
 	"type": "module",
 	"directus:extension": {
-		"type": "endpoint",
-		"path": "dist/index.js",
-		"source": "src/index.js",
+		"type": "bundle",
+		"path": {
+			"app": "dist/app.js",
+			"api": "dist/index.js"
+		},
+		"entries": [
+			{
+				"type": "endpoint",
+				"name": "kubernetes",
+				"source": "src/index.js"
+			},
+			{
+				"type": "hook",
+				"name": "kubernetes-sync",
+				"source": "src/hooks/sync-deployments.js"
+			}
+		],
 		"host": "^10.3.4"
 	},
 	"scripts": {

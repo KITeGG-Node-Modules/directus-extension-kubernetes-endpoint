@@ -16,14 +16,18 @@
 #     Kubernetes API are unreachable.
 #
 # THIS manifest adds a second, admin-owned line of defense for every pod
-# carrying the shared workload label `llp.kitegg.de/workload: "true"`
-# (stamped on all pod templates since the isolation rollout). If the
-# extension's account were compromised, the per-deployment policies could
-# be rewritten — these policies could not (the extension's RBAC grants
-# networkpolicies only within the services namespace, and this manifest is
-# applied and owned by cluster admins). Deployments whose pods do not yet
-# carry the workload label (created before the rollout) are still fully
-# isolated by their per-deployment policies.
+# whose `app` label is NOT one of the system-internal services — i.e.
+# exactly the user workloads, previously existing pods included. The
+# selector never requires a pod template change, so nothing is restarted
+# and no label rollout is needed. Pods WITHOUT an `app` label (e.g. the
+# kuberay-operator, which only carries `app.kubernetes.io/*` labels) are
+# not selected and unaffected. MAINTENANCE: keep the NotIn value list in
+# sync with SYSTEM_APP_LABEL_VALUES in the extension.
+#
+# If the extension's account were compromised, the per-deployment policies
+# could be rewritten — these policies could not (the extension's RBAC
+# grants networkpolicies only within the services namespace, and this
+# manifest is applied and owned by cluster admins).
 #
 # Cluster facts these values are based on (see the jupyterhub repo):
 #   - kubeadm, pod CIDR 192.168.0.0/16, service CIDR 10.96.0.0/12
@@ -60,8 +64,18 @@ metadata:
   namespace: services
 spec:
   podSelector:
-    matchLabels:
-      llp.kitegg.de/workload: "true"
+    matchExpressions:
+      - key: app
+        operator: Exists
+      - key: app
+        operator: NotIn
+        values:
+          - cache
+          - nginx
+          - openwebui
+          - openwebui-ccl
+          - service-proxy
+          - tty-server
   policyTypes:
     - Ingress
   # No ingress rules: everything is denied unless a per-deployment policy
@@ -74,8 +88,18 @@ metadata:
   namespace: services
 spec:
   podSelector:
-    matchLabels:
-      llp.kitegg.de/workload: "true"
+    matchExpressions:
+      - key: app
+        operator: Exists
+      - key: app
+        operator: NotIn
+        values:
+          - cache
+          - nginx
+          - openwebui
+          - openwebui-ccl
+          - service-proxy
+          - tty-server
   policyTypes:
     - Egress
   egress:

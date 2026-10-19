@@ -101,11 +101,16 @@ describe('makeNetworkPolicy', () => {
     expect(proxyPeer.podSelector.matchLabels).toEqual({ app: 'service-proxy' })
     expect(pathRule.ports.map((port) => port.port)).toEqual([80, 8080])
 
-    const [jupyterhubPeer, userPodsPeer] = publicRule.from
+    const [jupyterhubPeer, openwebuiPeer, openwebuiCclPeer, userPodsPeer] =
+      publicRule.from
     expect(jupyterhubPeer.namespaceSelector.matchLabels).toEqual({
       'kubernetes.io/metadata.name': 'jupyterhub',
     })
     expect(jupyterhubPeer.podSelector).toBeUndefined()
+    expect(openwebuiPeer.podSelector.matchLabels).toEqual({ app: 'openwebui' })
+    expect(openwebuiCclPeer.podSelector.matchLabels).toEqual({
+      app: 'openwebui-ccl',
+    })
     expect(userPodsPeer.podSelector.matchExpressions).toEqual([
       { key: 'app', operator: 'Exists' },
       {
@@ -217,18 +222,30 @@ describe('restricted deployments with a published port', () => {
       exposedPorts: [{ name: 'admin', port: 9000 }],
     })
 
-    // Ingress path rule exists, restricted to the exposed port
+    // Ingress path rule exists, restricted to the exposed port. The Open
+    // WebUI instances reach the published port too — regardless of the
+    // deployment's visibility.
     const pathRule = policy.spec.ingress.at(-1)
-    const [traefikPeer, proxyPeer] = pathRule.from
+    const [traefikPeer, proxyPeer, openwebuiPeer, openwebuiCclPeer] =
+      pathRule.from
     expect(traefikPeer.namespaceSelector.matchLabels).toEqual({
       'kubernetes.io/metadata.name': 'traefik-v2',
     })
     expect(proxyPeer.podSelector.matchLabels).toEqual({ app: 'service-proxy' })
+    expect(openwebuiPeer.podSelector.matchLabels).toEqual({ app: 'openwebui' })
+    expect(openwebuiCclPeer.podSelector.matchLabels).toEqual({
+      app: 'openwebui-ccl',
+    })
     expect(pathRule.ports.map((port) => port.port)).toEqual([9000])
 
     // No rule for other user deployments or the extra ingress namespaces
     const sources = policy.spec.ingress.flatMap((rule) =>
-      (rule.from ?? []).map((peer) => peer.namespaceSelector?.matchLabels?.['kubernetes.io/metadata.name'] ?? null)
+      (rule.from ?? []).map(
+        (peer) =>
+          peer.namespaceSelector?.matchLabels?.['kubernetes.io/metadata.name'] ??
+          peer.podSelector?.matchLabels?.app ??
+          null
+      )
     )
     expect(sources).not.toContain('jupyterhub')
   })
