@@ -44,12 +44,11 @@ describe('sync-deployments hook', () => {
     vi.useRealTimers()
   })
 
-  it('registers update/create actions, a delete action and a schedule', () => {
+  it('registers update/create actions and a schedule', () => {
     const api = register()
     expect(api.action.mock.calls.map(([event]) => event)).toEqual([
       'deployments.items.update',
       'deployments.items.create',
-      'deployments.items.delete',
     ])
     expect(api.schedule.mock.calls[0][0]).toBe('*/10 * * * *')
   })
@@ -69,14 +68,6 @@ describe('sync-deployments hook', () => {
     actionHandler(api, 'deployments.items.create')({ key: 'abc' })
     await vi.advanceTimersByTimeAsync(2000)
     expect(syncDeploymentIds).toHaveBeenCalledWith(context.services, { some: 'schema' }, ['abc'])
-  })
-
-  it('runs a full sync when a deployment is deleted directly', async () => {
-    const api = register()
-    actionHandler(api, 'deployments.items.delete')({ keys: ['5'] })
-    await vi.advanceTimersByTimeAsync(2000)
-    expect(backfillNetworkPolicies).toHaveBeenCalledTimes(1)
-    expect(syncDeploymentIds).not.toHaveBeenCalled()
   })
 
   it('runs the scheduled reconciliation as a full sync', async () => {

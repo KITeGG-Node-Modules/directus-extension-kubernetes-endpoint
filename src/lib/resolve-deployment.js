@@ -1,4 +1,4 @@
-import { deploymentAuthorsField, deploymentPublicStatuses, enforceDeploymentOwnership } from './config.js'
+import { deploymentAuthorsField, enforceDeploymentOwnership } from './config.js'
 import { COLLECTIONS } from './constants.js'
 
 /**
@@ -55,38 +55,6 @@ function authorIdFrom(entry) {
     if (id != null) return id
   }
   return toId(entry.id)
-}
-
-/**
- * Owner ids that determine which deployments may reach a restricted
- * deployment over the network: `user_created` and the `authors` M2M list.
- * (Deliberately not `user_updated` — who last modified an item is not the
- * same as who may access it.)
- */
-export function deploymentOwnerIds(deployment) {
-  const ownerIds = []
-  const createdId = toId(deployment?.user_created)
-  if (createdId != null) ownerIds.push(String(createdId))
-  const authors = deployment?.[deploymentAuthorsField]
-  if (authors != null) {
-    for (const entry of Array.isArray(authors) ? authors : [authors]) {
-      const id = authorIdFrom(entry) ?? toId(entry)
-      if (id != null && !ownerIds.includes(String(id))) {
-        ownerIds.push(String(id))
-      }
-    }
-  }
-  return ownerIds
-}
-
-/**
- * Whether the deployment is publicly reachable. Deployments whose Directus
- * `status` is not listed in DEPLOYMENT_PUBLIC_STATUSES (drafts, restricted
- * states and deployments without a status) can only be reached by
- * deployments of the same owners.
- */
-export function isPublicDeployment(deployment) {
-  return deploymentPublicStatuses.includes(String(deployment?.status ?? ''))
 }
 
 /**

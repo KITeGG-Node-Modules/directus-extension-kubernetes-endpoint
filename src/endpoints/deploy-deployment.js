@@ -14,7 +14,7 @@ import {
   parseDeploymentData,
 } from '../lib/util.js'
 import { validateDeployment } from '../lib/validate-deployment.js'
-import { syncOwnerGroup } from '../sync-network-policies.js'
+import { syncDeploymentIds } from '../sync-network-policies.js'
 
 export async function deployDeployment(ctx) {
   const { req, res, user, userGroups, services } = ctx
@@ -59,12 +59,9 @@ export async function deployDeployment(ctx) {
   // Isolation resources are created before the stateful set so a
   // deployment is never running without them (fail closed). If the
   // extension's account lacks the networkpolicies RBAC (k8s/rbac.yaml),
-  // deploying fails with a 403. The whole owner group is synced: this
-  // deployment's policy needs its peers, and the peers' policies must
-  // start allowing this deployment (or stop allowing it after owner
-  // changes).
+  // deploying fails with a 403.
   try {
-    await syncOwnerGroup(services, req.schema, deployment)
+    await syncDeploymentIds(services, req.schema, [deployment.id])
   } catch (err) {
     return handleErrorResponse(res, err)
   }

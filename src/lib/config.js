@@ -15,19 +15,6 @@ export const enforceDeploymentOwnership =
 // Storage class for volume claim templates
 export const storageClassName = process.env.SERVICES_STORAGE_CLASS || 'longhorn'
 
-// Deployment statuses that make a deployment PUBLICLY reachable (from the
-// ingress path, on its declared service ports). Deployments in any other
-// state (draft, restricted, unknown) can only be reached on their declared
-// service ports by deployments of the same owners (user_created / authors).
-// The Directus `status` field of the deployments collection decides; set to
-// a comma-separated list to allow several public states.
-export const deploymentPublicStatuses = (
-  process.env.DEPLOYMENT_PUBLIC_STATUSES ?? 'published'
-)
-  .split(',')
-  .map((status) => status.trim())
-  .filter(Boolean)
-
 // Registries user containers may pull images from. Bare image names
 // ('pytorch/pytorch') imply docker.io. Comma-separated env override
 // replaces the default; set IMAGE_REGISTRY_ALLOWLIST='*' to disable the

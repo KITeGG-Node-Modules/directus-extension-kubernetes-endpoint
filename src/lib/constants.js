@@ -5,25 +5,23 @@ export const APP_LABEL_KEY = 'app'
 // Annotation used to force pod restarts on deployment updates
 export const RESTART_ANNOTATION_KEY = 'llp.kitegg.de/restartedAt'
 
-// Ingress sources allowed to reach PUBLIC deployments, matching the
-// sources documented in k8s/network-policy.yaml:
+// Ingress sources allowed to reach deployments, matching the sources
+// documented in k8s/network-policy.yaml:
 // - the Traefik ingress controller namespace (direct IngressRoutes), and
 // - the oauth2-proxy pods fronting *.service.kitegg.hs-mainz.de, running
 //   in the services namespace itself (verified pod label: app: service-proxy)
 export const INGRESS_NAMESPACE = 'traefik-v2'
 export const INGRESS_PROXY_POD_LABELS = { app: 'service-proxy' }
 
-// Additional namespaces whose pods may reach PUBLIC deployments on their
+// Additional namespaces whose pods may reach deployments on their
 // declared service ports — the JupyterHub hub and user notebooks connect
-// to published user services directly. Draft/restricted deployments stay
-// unreachable from these namespaces.
+// to published user services directly.
 export const INGRESS_EXTRA_NAMESPACES = ['jupyterhub']
 
-// System-internal pods allowed to reach PUBLIC deployments on their
-// declared service ports: the Open WebUI instances connect to published
-// user services (e.g. LLM gateways) directly. Restricted deployments —
-// including drafts with a published port — stay unreachable for them.
-export const PUBLIC_INGRESS_SYSTEM_POD_LABELS = [
+// System-internal pods allowed to reach deployments on their declared
+// service ports: the Open WebUI instances connect to published user
+// services (e.g. LLM gateways) directly.
+export const INGRESS_SYSTEM_POD_LABELS = [
   { app: 'openwebui' },
   { app: 'openwebui-ccl' },
 ]

@@ -1,37 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   declaredPorts,
-  exposedPortsOf,
   makeNetworkPolicy,
 } from '../src/lib/make-network-policy.js'
-import { peerDeploymentNames } from '../src/lib/deployment-peers.js'
 import { makeHeadlessService, makeService } from '../src/lib/make-service.js'
-
-const USER = '9f8b1c3e-2a4d-4c6b-8e0f-1a2b3c4d5e6f'
-const COLLEAGUE = '42'
-
-const deployments = [
-  {
-    id: '11111111-1111-1111-1111-111111111111',
-    user_created: { id: USER },
-    authors: [{ directus_users_id: { id: COLLEAGUE } }],
-  },
-  {
-    id: '22222222-2222-2222-2222-222222222222',
-    user_created: { id: USER },
-    authors: [],
-  },
-  {
-    id: '33333333-3333-3333-3333-333333333333',
-    user_created: { id: COLLEAGUE },
-    authors: [],
-  },
-  {
-    id: '44444444-4444-4444-4444-444444444444',
-    user_created: { id: 'other-user' },
-    authors: [],
-  },
-]
 
 const ports = [{ name: 'http', port: 80 }, { port: 8080 }]
 
@@ -41,28 +13,10 @@ function ingressSources(rule) {
   )
 }
 
-describe('peerDeploymentNames', () => {
-  it('returns deployments sharing an owner, excluding the deployment itself', () => {
-    const current = deployments[0]
-    expect(peerDeploymentNames(deployments, current)).toEqual([
-      'sd-22222222-2222-2222-2222-222222222222',
-      'sd-33333333-3333-3333-3333-333333333333',
-    ])
-  })
-
-  it('returns nothing for deployments without owners', () => {
-    expect(peerDeploymentNames(deployments, { id: '5' })).toEqual([])
-  })
-})
-
 describe('makeNetworkPolicy', () => {
-  const peers = ['sd-22222222-2222-2222-2222-222222222222']
 
-  it('allows itself and same-owner deployments only when restricted', () => {
-    const policy = makeNetworkPolicy('sd-5', {
-      peerNames: peers,
-      ports,
-    })
+  it('allows itself, the ingress path and other user workloads', () => {
+    const policy = makeNetworkPolicy('sd-5', { ports })
     expect(policy.metadata).toMatchObject({
       name: 'sd-5',
       namespace: 'services',
@@ -72,27 +26,11 @@ describe('makeNetworkPolicy', () => {
     expect(policy.spec.podSelector.matchLabels).toEqual({ app: 'sd-5' })
 
     // Self rule without port restrictions
-    const [selfRule, ...peerRules] = policy.spec.ingress
+    const [selfRule, pathRule, publicRule] = policy.spec.ingress
     expect(ingressSources(selfRule)).toEqual([{ app: 'sd-5' }])
     expect(selfRule.ports).toBeUndefined()
 
-    // One rule per same-owner deployment, restricted to the declared ports
-    expect(peerRules).toHaveLength(peers.length)
-    for (const [index, rule] of peerRules.entries()) {
-      expect(ingressSources(rule)).toEqual([{ app: peers[index] }])
-      expect(rule.ports.map((port) => port.port)).toEqual([80, 8080])
-    }
-  })
-
-  it('adds the ingress path and other user deployments for public deployments', () => {
-    const policy = makeNetworkPolicy('sd-5', {
-      peerNames: peers,
-      ports,
-      isPublic: true,
-    })
-    // Separate rules: ingress path, then extra namespaces + user pods
-    const pathRule = policy.spec.ingress.at(-2)
-    const publicRule = policy.spec.ingress.at(-1)
+    // The ingress path (Traefik + oauth2-proxy) on the declared ports
     const [traefikPeer, proxyPeer] = pathRule.from
     expect(traefikPeer.namespaceSelector.matchLabels).toEqual({
       'kubernetes.io/metadata.name': 'traefik-v2',
@@ -101,6 +39,7 @@ describe('makeNetworkPolicy', () => {
     expect(proxyPeer.podSelector.matchLabels).toEqual({ app: 'service-proxy' })
     expect(pathRule.ports.map((port) => port.port)).toEqual([80, 8080])
 
+    // Extra ingress namespaces, Open WebUI instances and user pods
     const [jupyterhubPeer, openwebuiPeer, openwebuiCclPeer, userPodsPeer] =
       publicRule.from
     expect(jupyterhubPeer.namespaceSelector.matchLabels).toEqual({
@@ -129,8 +68,15 @@ describe('makeNetworkPolicy', () => {
     expect(publicRule.ports.map((port) => port.port)).toEqual([80, 8080])
   })
 
+  it('is independent of the deployment status (drafts are unrestricted)', () => {
+    // The policy input carries no visibility information at all: every
+    // deployment gets the same ingress rules
+    const policy = makeNetworkPolicy('sd-5', { ports })
+    expect(policy.spec.ingress).toHaveLength(3)
+  })
+
   it('builds egress for DNS, user pods and the internet only', () => {
-    const policy = makeNetworkPolicy('sd-5', { peerNames: peers, ports })
+    const policy = makeNetworkPolicy('sd-5', { ports })
     const [dnsRule, userPodsRule, internetRule] = policy.spec.egress
 
     expect(dnsRule.to[0]).toMatchObject({
@@ -160,103 +106,11 @@ describe('makeNetworkPolicy', () => {
   })
 
   it('allows all ports when the deployment declares none', () => {
-    const policy = makeNetworkPolicy('sd-5', {
-      peerNames: peers,
-      isPublic: true,
-    })
+    const policy = makeNetworkPolicy('sd-5', {})
     const [, ...withoutSelf] = policy.spec.ingress
     for (const rule of withoutSelf) {
       expect(rule.ports).toBeUndefined()
     }
-  })
-})
-
-describe('exposedPortsOf', () => {
-  const data = {
-    containers: [
-      { name: 'app', ports: [{ name: 'http', port: 80 }, { name: 'admin', port: 9000 }] },
-      { name: 'sidecar', ports: [{ name: 'metrics', port: 9090 }] },
-    ],
-  }
-
-  it('resolves the published port of the exposed container by name', () => {
-    expect(
-      exposedPortsOf({ exposed_service: 'app', exposed_port: 'http' }, data)
-    ).toEqual([{ name: 'http', port: 80 }])
-  })
-
-  it('resolves by port number', () => {
-    expect(
-      exposedPortsOf({ exposed_service: 'app', exposed_port: 9000 }, data)
-    ).toEqual([{ name: 'admin', port: 9000 }])
-    // Also accepts a number as string
-    expect(
-      exposedPortsOf({ exposed_service: 'app', exposed_port: '9000' }, data)
-    ).toEqual([{ name: 'admin', port: 9000 }])
-  })
-
-  it('falls back to all ports of the exposed container when no port is given', () => {
-    expect(exposedPortsOf({ exposed_service: 'app' }, data)).toEqual([
-      { name: 'http', port: 80 },
-      { name: 'admin', port: 9000 },
-    ])
-  })
-
-  it('falls back to all containers when no service is given', () => {
-    expect(
-      exposedPortsOf({ exposed_port: 'metrics' }, data)
-    ).toEqual([{ name: 'metrics', port: 9090 }])
-  })
-
-  it('publishes nothing for unknown containers, ports or unset fields', () => {
-    expect(exposedPortsOf({ exposed_service: 'nope', exposed_port: 'http' }, data)).toEqual([])
-    expect(exposedPortsOf({ exposed_service: 'app', exposed_port: 'nope' }, data)).toEqual([])
-    expect(exposedPortsOf({}, data)).toEqual([])
-  })
-})
-
-describe('restricted deployments with a published port', () => {
-  it('lets the ingress path reach only the published port', () => {
-    const policy = makeNetworkPolicy('sd-5', {
-      ports: [{ name: 'http', port: 80 }, { name: 'admin', port: 9000 }],
-      exposedPorts: [{ name: 'admin', port: 9000 }],
-    })
-
-    // Ingress path rule exists, restricted to the exposed port. The Open
-    // WebUI instances reach the published port too — regardless of the
-    // deployment's visibility.
-    const pathRule = policy.spec.ingress.at(-1)
-    const [traefikPeer, proxyPeer, openwebuiPeer, openwebuiCclPeer] =
-      pathRule.from
-    expect(traefikPeer.namespaceSelector.matchLabels).toEqual({
-      'kubernetes.io/metadata.name': 'traefik-v2',
-    })
-    expect(proxyPeer.podSelector.matchLabels).toEqual({ app: 'service-proxy' })
-    expect(openwebuiPeer.podSelector.matchLabels).toEqual({ app: 'openwebui' })
-    expect(openwebuiCclPeer.podSelector.matchLabels).toEqual({
-      app: 'openwebui-ccl',
-    })
-    expect(pathRule.ports.map((port) => port.port)).toEqual([9000])
-
-    // No rule for other user deployments or the extra ingress namespaces
-    const sources = policy.spec.ingress.flatMap((rule) =>
-      (rule.from ?? []).map(
-        (peer) =>
-          peer.namespaceSelector?.matchLabels?.['kubernetes.io/metadata.name'] ??
-          peer.podSelector?.matchLabels?.app ??
-          null
-      )
-    )
-    expect(sources).not.toContain('jupyterhub')
-  })
-
-  it('publishes nothing for restricted deployments without a published port', () => {
-    const policy = makeNetworkPolicy('sd-5', {
-      peerNames: [],
-      ports: [{ name: 'http', port: 80 }],
-    })
-    // Only the self rule
-    expect(policy.spec.ingress).toHaveLength(1)
   })
 })
 

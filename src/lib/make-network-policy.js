@@ -5,7 +5,7 @@ import {
   INGRESS_EXTRA_NAMESPACES,
   INGRESS_NAMESPACE,
   INGRESS_PROXY_POD_LABELS,
-  PUBLIC_INGRESS_SYSTEM_POD_LABELS,
+  INGRESS_SYSTEM_POD_LABELS,
   SYSTEM_APP_LABEL_VALUES,
 } from './constants.js'
 
@@ -50,18 +50,13 @@ const INTERNET_EXCEPT = [
  *
  * Ingress:
  * - replicas of the deployment itself (any port),
- * - deployments of the same owners (`user_created` / `authors`), matched
- *   by their `app` label, on the deployment's declared service ports only,
  * - the ingress path (Traefik directly, and oauth2-proxy for
- *   *.service.kitegg.hs-mainz.de): for PUBLIC deployments on the declared
- *   service ports,
- * - a published port (`exposed_service` / `exposed_port`) is reachable by
- *   the ingress path AND by the Open WebUI instances regardless of the
- *   deployment's visibility and access control — the published port is
- *   the only requirement,
- * - PUBLIC deployments additionally from other user deployments and from
- *   the extra ingress namespaces (JupyterHub), on the declared service
- *   ports only.
+ *   *.service.kitegg.hs-mainz.de), on the declared service ports only,
+ * - the extra ingress namespaces (JupyterHub), the Open WebUI instances
+ *   and other user deployments — also on the declared ports only.
+ *
+ * The deployment's Directus `status` (e.g. `draft`) does not participate
+ * in the policy: it only controls visibility in the services overview.
  *
  * Egress:
  * - DNS (CoreDNS in kube-system),
@@ -75,10 +70,7 @@ const INTERNET_EXCEPT = [
  * pods and services of any other namespace, node networks and the
  * Kubernetes API.
  */
-export function makeNetworkPolicy(
-  statefulSetName,
-  { peerNames = [], ports = [], exposedPorts = [], isPublic = false } = {}
-) {
+export function makeNetworkPolicy(statefulSetName, { ports = [] } = {}) {
   const metadata = new k8s.V1ObjectMeta()
   metadata.name = statefulSetName
   metadata.namespace = servicesNamespace
@@ -96,60 +88,29 @@ export function makeNetworkPolicy(
     makeIngressRule([podPeer({ [APP_LABEL_KEY]: statefulSetName })], null)
   )
 
-  // Deployments of the same owners, on the declared service ports only
-  for (const peerName of peerNames) {
-    ingress.push(
-      makeIngressRule([podPeer({ [APP_LABEL_KEY]: peerName })], ports)
-    )
-  }
+  // The ingress path (Traefik and oauth2-proxy), on the declared ports
+  ingress.push(makeIngressRule(ingressPathPeers(), ports))
 
-  // Ingress path (Traefik and oauth2-proxy): always allowed for public
-  // deployments (on all declared ports), and for ANY deployment that has
-  // a published port (exposed_service / exposed_port) — but only on that
-  // port, regardless of visibility. Drafts without a published port stay
-  // unreachable from the ingress path.
-  if (isPublic) {
-    ingress.push(makeIngressRule(ingressPathPeers(), ports))
-  }
-
-  // A published port is reachable by the ingress path and by the Open
-  // WebUI instances — independent of the deployment's visibility and
-  // access control: the published port is the only requirement.
-  if (exposedPorts.length) {
-    ingress.push(
-      makeIngressRule(
-        [
-          ...ingressPathPeers(),
-          ...PUBLIC_INGRESS_SYSTEM_POD_LABELS.map((labels) => podPeer(labels)),
-        ],
-        exposedPorts
-      )
+  // The extra ingress namespaces (JupyterHub), the Open WebUI instances
+  // and other user deployments, on the declared ports only
+  const extraNamespacePeers = INGRESS_EXTRA_NAMESPACES.map((namespace) => {
+    const peer = new k8s.V1NetworkPolicyPeer()
+    peer.namespaceSelector = new k8s.V1LabelSelector()
+    peer.namespaceSelector.matchLabels = {
+      'kubernetes.io/metadata.name': namespace,
+    }
+    return peer
+  })
+  ingress.push(
+    makeIngressRule(
+      [
+        ...extraNamespacePeers,
+        ...INGRESS_SYSTEM_POD_LABELS.map((labels) => podPeer(labels)),
+        anyUserPodPeer(),
+      ],
+      ports
     )
-  }
-
-  // Public deployments are additionally reachable from other user
-  // deployments and from the extra ingress namespaces (JupyterHub), on
-  // the declared ports only. Restricted deployments are not.
-  if (isPublic) {
-    const extraNamespacePeers = INGRESS_EXTRA_NAMESPACES.map((namespace) => {
-      const peer = new k8s.V1NetworkPolicyPeer()
-      peer.namespaceSelector = new k8s.V1LabelSelector()
-      peer.namespaceSelector.matchLabels = {
-        'kubernetes.io/metadata.name': namespace,
-      }
-      return peer
-    })
-    ingress.push(
-      makeIngressRule(
-        [
-          ...extraNamespacePeers,
-          ...PUBLIC_INGRESS_SYSTEM_POD_LABELS.map((labels) => podPeer(labels)),
-          anyUserPodPeer(),
-        ],
-        ports
-      )
-    )
-  }
+  )
   spec.ingress = ingress
 
   const egress = []
@@ -273,40 +234,4 @@ export function declaredPorts(servicePayloads) {
     }
   }
   return ports
-}
-
-/**
- * Resolve the deployment's published port from its `exposed_service`
- * (container name) and `exposed_port` (container port name or number)
- * fields against the declared container ports. Returns the matching
- * declared ports — or nothing when the fields are unset, the exposed
- * container does not exist, or no declared port matches, so a restricted
- * deployment is never opened up beyond what is actually published.
- */
-export function exposedPortsOf(deployment, deploymentData) {
-  const exposedService = deployment?.exposed_service ?? null
-  const exposedPort = deployment?.exposed_port ?? null
-  if (exposedService == null && exposedPort == null) return []
-
-  const containers = deploymentData?.containers ?? []
-  const container =
-    exposedService != null
-      ? containers.find((c) => c?.name === exposedService)
-      : undefined
-  // An exposed_service that does not match any container publishes nothing
-  if (exposedService != null && !container) return []
-
-  const candidates = container
-    ? container.ports ?? []
-    : containers.flatMap((c) => c?.ports ?? [])
-  const matched =
-    exposedPort == null
-      ? candidates
-      : candidates.filter(
-          (p) =>
-            p?.name === exposedPort ||
-            p?.port === exposedPort ||
-            String(p?.port) === String(exposedPort)
-        )
-  return declaredPorts(matched.map((port) => ({ ports: [port] })))
 }
