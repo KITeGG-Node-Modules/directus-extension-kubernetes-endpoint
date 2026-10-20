@@ -31,8 +31,22 @@ export const INGRESS_SYSTEM_POD_LABELS = [
 // ingress LoadBalancer (80/443). Egress to them is allowed on the web
 // ports only — the Kubernetes API stays unreachable (the internet egress
 // rule excepts these addresses entirely, see make-network-policy.js).
+//
+// NOTE on .63 (this cluster's ingress IP): kube-proxy DNATs packets to the
+// Traefik LoadBalancer IP into the Traefik POD (192.168.23.x) BEFORE Calico
+// evaluates the egress policy, so the /32 rule below never matches for
+// .63 — the dedicated traefik-v2 namespace rule (see
+// INGRESS_CONTROLLER_EGRESS_PORTS) is what actually carries this traffic.
+// The /32 rule stays for .62 (the other cluster's ingress, no local DNAT)
+// and as a fallback.
 export const PUBLIC_INGRESS_IPS = ['134.93.175.62', '134.93.175.63']
-export const PUBLIC_INGRESS_PORTS = [80, 443]
+
+// Traefik's POD ports (targetPort of the traefik-v2 Service: web -> 8000,
+// websecure -> 8443). Egress policy is evaluated AFTER kube-proxy's DNAT,
+// so pods connecting to the public ingress IP arrive at Calico with these
+// ports as the destination — the public ports (80/443) are already gone.
+// Verified against the live traefik-v2/traefik Service.
+export const INGRESS_CONTROLLER_EGRESS_PORTS = [8000, 8443]
 
 // `app` label values of the system-internal services sharing the services
 // namespace. Used to exclude them from the "any user pod" selectors (as an

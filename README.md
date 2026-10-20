@@ -105,11 +105,13 @@ Each deployment's policy enforces:
   `openwebui*`, `service-proxy`, `tty-server`), pods and services of any
   other namespace, node networks and the Kubernetes API are unreachable —
   including the public control-plane addresses (`134.93.175.62/.63`),
-  which are blocked explicitly. Exception: the same addresses front the
-  Traefik ingress LoadBalancer, so the web ports (TCP 80/443) to
-  `134.93.175.62/.63` are allowed explicitly — user workloads can reach
-  each other via their public URLs. Every other port (notably the
-  Kubernetes API on 6443) stays blocked on those addresses.
+  which are blocked explicitly. Exceptions for the ingress path only: the
+  public addresses are reachable on the web ports (TCP 80/443), and the
+  Traefik pods (namespace `traefik-v2`) on their entrypoint ports
+  (TCP 8000/8443) — kube-proxy DNATs connections to the public ingress IP
+  into the Traefik pod *before* the egress policy is evaluated, so the
+  namespace rule is what actually carries that traffic. Every other port
+  (notably the Kubernetes API on 6443) stays blocked on those addresses.
 
 The Directus `status` of the `deployments` collection does not affect
 network access (see [Network isolation](#network-isolation)): every

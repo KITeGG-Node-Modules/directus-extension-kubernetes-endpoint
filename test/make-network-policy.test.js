@@ -75,9 +75,9 @@ describe('makeNetworkPolicy', () => {
     expect(policy.spec.ingress).toHaveLength(3)
   })
 
-  it('builds egress for DNS, user pods, the public ingress and the internet', () => {
+  it('builds egress for DNS, user pods, the ingress path and the internet', () => {
     const policy = makeNetworkPolicy('sd-5', { ports })
-    const [dnsRule, userPodsRule, publicIngressRule, internetRule] =
+    const [dnsRule, userPodsRule, publicIngressRule, traefikRule, internetRule] =
       policy.spec.egress
 
     expect(dnsRule.to[0]).toMatchObject({
@@ -103,6 +103,19 @@ describe('makeNetworkPolicy', () => {
     ).toEqual([
       ['TCP', 80],
       ['TCP', 443],
+    ])
+
+    // The Traefik pods: kube-proxy DNATs ingress-IP connections into the
+    // traefik-v2 namespace BEFORE policy evaluation, so this rule (on the
+    // Traefik pod ports) is what carries the actual traffic
+    expect(traefikRule.to[0].namespaceSelector.matchLabels).toEqual({
+      'kubernetes.io/metadata.name': 'traefik-v2',
+    })
+    expect(
+      traefikRule.ports.map((port) => [port.protocol, port.port])
+    ).toEqual([
+      ['TCP', 8000],
+      ['TCP', 8443],
     ])
 
     expect(internetRule.to[0].ipBlock.cidr).toBe('0.0.0.0/0')

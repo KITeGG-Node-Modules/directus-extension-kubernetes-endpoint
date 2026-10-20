@@ -2,12 +2,12 @@ import k8s from '@kubernetes/client-node'
 import { servicesNamespace } from './config.js'
 import {
   APP_LABEL_KEY,
+  INGRESS_CONTROLLER_EGRESS_PORTS,
   INGRESS_EXTRA_NAMESPACES,
   INGRESS_NAMESPACE,
   INGRESS_PROXY_POD_LABELS,
   INGRESS_SYSTEM_POD_LABELS,
   PUBLIC_INGRESS_IPS,
-  PUBLIC_INGRESS_PORTS,
   SYSTEM_APP_LABEL_VALUES,
 } from './constants.js'
 
@@ -72,9 +72,11 @@ const INTERNET_EXCEPT = [
  *   DNS resolves to the pod IPs),
  * - the public internet,
  * - the Traefik entry point on the cluster's public addresses
- *   (hsm-kitegg-a/b.zdv.uni-mainz.de), on the web ports only — these
- *   addresses also host the Kubernetes API, which stays blocked because
- *   the internet rule excepts them entirely (see INTERNET_EXCEPT).
+ *   (hsm-kitegg-a/b.zdv.uni-mainz.de) and the Traefik pods themselves
+ *   (traefik-v2 namespace) on their entrypoint ports — these addresses
+ *   and pods also front the ingress; the Kubernetes API stays blocked
+ *   because the internet rule excepts the public addresses entirely and
+ *   no other cluster-internal destination is allowed.
  *
  * Everything else is denied: system-internal services in the namespace,
  * pods and services of any other namespace, node networks and the
@@ -158,10 +160,13 @@ export function makeNetworkPolicy(statefulSetName, { ports = [] } = {}) {
   ]
   egress.push(userPodsRule)
 
-  // The Traefik entry point on the public control-plane addresses: only
-  // the web ports are opened here. The internet rule below keeps
-  // excepting these addresses entirely, so every other port — notably
-  // the Kubernetes API on 6443 — remains unreachable.
+  // The Traefik entry point on the public control-plane addresses. The
+  // internet rule below keeps excepting these addresses entirely, so every
+  // other port — notably the Kubernetes API on 6443 — remains unreachable.
+  // For .63 this rule is mostly a no-op in practice: kube-proxy DNATs
+  // packets to the ingress IP into the Traefik pod before Calico evaluates
+  // this policy, so the namespace rule below is what carries that traffic
+  // (see PUBLIC_INGRESS_IPS in constants.js).
   const publicIngressRule = new k8s.V1NetworkPolicyEgressRule()
   publicIngressRule.to = PUBLIC_INGRESS_IPS.map((ip) => {
     const peer = new k8s.V1NetworkPolicyPeer()
@@ -170,13 +175,39 @@ export function makeNetworkPolicy(statefulSetName, { ports = [] } = {}) {
     peer.ipBlock = block
     return peer
   })
-  publicIngressRule.ports = PUBLIC_INGRESS_PORTS.map((port) => {
+  publicIngressRule.ports = ['TCP'].flatMap((protocol) =>
+    [80, 443].map((port) => {
+      const policyPort = new k8s.V1NetworkPolicyPort()
+      policyPort.protocol = protocol
+      policyPort.port = port
+      return policyPort
+    })
+  )
+  egress.push(publicIngressRule)
+
+  // The Traefik pods themselves: kube-proxy DNATs connections to the
+  // public ingress IP into the Traefik pod (traefik-v2 namespace) BEFORE
+  // Calico evaluates egress policy, so the destination seen here is the
+  // Traefik pod IP on its pod ports (8000/8443) — cluster-internal, hence
+  // otherwise dropped by the internet rule's pod-CIDR exception. This rule
+  // re-opens exactly that path, port-restricted to Traefik's entrypoints.
+  // New connections from Traefik to user pods are already covered by the
+  // ingress rules; replies to this direction are ESTABLISHED and bypass
+  // the ingress default-deny.
+  const traefikRule = new k8s.V1NetworkPolicyEgressRule()
+  const traefikPeer = new k8s.V1NetworkPolicyPeer()
+  traefikPeer.namespaceSelector = new k8s.V1LabelSelector()
+  traefikPeer.namespaceSelector.matchLabels = {
+    'kubernetes.io/metadata.name': INGRESS_NAMESPACE,
+  }
+  traefikRule.to = [traefikPeer]
+  traefikRule.ports = INGRESS_CONTROLLER_EGRESS_PORTS.map((port) => {
     const policyPort = new k8s.V1NetworkPolicyPort()
     policyPort.protocol = 'TCP'
     policyPort.port = port
     return policyPort
   })
-  egress.push(publicIngressRule)
+  egress.push(traefikRule)
 
   // The public internet (cluster-internal ranges excluded, see above)
   const internetRule = new k8s.V1NetworkPolicyEgressRule()

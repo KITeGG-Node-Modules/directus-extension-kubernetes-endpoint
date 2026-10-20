@@ -177,6 +177,11 @@ spec:
     # opened here; the `except` entries above keep these addresses blocked
     # on every other port, so the Kubernetes API (6443) remains
     # unreachable.
+    # NOTE on .63: kube-proxy DNATs packets to the ingress IP into the
+    # Traefik pod BEFORE Calico evaluates this policy — the destination
+    # seen here is the Traefik pod IP (pod CIDR, caught by the 192.168/16
+    # exception above), so for .63 the rule below never matches and the
+    # namespace rule after it carries the traffic instead.
     - to:
         - ipBlock:
             cidr: 134.93.175.62/32
@@ -187,3 +192,19 @@ spec:
           port: 80
         - protocol: TCP
           port: 443
+    # The Traefik pods themselves (traefik-v2 namespace): the actual path
+    # for pods connecting to the public ingress IP (.63). kube-proxy DNATs
+    # to the Traefik pod (192.168.23.x) before Calico evaluates egress, so
+    # the destination is a pod IP on Traefik's POD ports (targetPort of the
+    # traefik-v2 Service: web -> 8000, websecure -> 8443) — cluster-internal
+    # and otherwise dropped by the pod-CIDR exception above. MAINTENANCE:
+    # keep the ports in sync with the traefik-v2 Service's targetPorts.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: traefik-v2
+      ports:
+        - protocol: TCP
+          port: 8000
+        - protocol: TCP
+          port: 8443
