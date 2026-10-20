@@ -6,6 +6,8 @@ import {
   INGRESS_NAMESPACE,
   INGRESS_PROXY_POD_LABELS,
   INGRESS_SYSTEM_POD_LABELS,
+  PUBLIC_INGRESS_IPS,
+  PUBLIC_INGRESS_PORTS,
   SYSTEM_APP_LABEL_VALUES,
 } from './constants.js'
 
@@ -25,7 +27,11 @@ import {
 //   - 134.93.175.62/32, .63/32 -> PUBLIC control-plane addresses
 //                          (hsm-kitegg-a/b.zdv.uni-mainz.de); without
 //                          these the pods could reach the Kubernetes API
-//                          over the internet
+//                          over the internet. The same addresses front
+//                          the Traefik ingress LoadBalancer — the web
+//                          ports are re-opened by a dedicated egress rule
+//                          below; everything else (notably 6443) stays
+//                          blocked.
 const INTERNET_EXCEPT = [
   '192.168.0.0/16',
   '10.96.0.0/12',
@@ -64,7 +70,11 @@ const INTERNET_EXCEPT = [
  *   may connect — this only provides the path; cross-deployment clients
  *   use the headless service `sd-<id>.services.svc.cluster.local`, whose
  *   DNS resolves to the pod IPs),
- * - the public internet.
+ * - the public internet,
+ * - the Traefik entry point on the cluster's public addresses
+ *   (hsm-kitegg-a/b.zdv.uni-mainz.de), on the web ports only — these
+ *   addresses also host the Kubernetes API, which stays blocked because
+ *   the internet rule excepts them entirely (see INTERNET_EXCEPT).
  *
  * Everything else is denied: system-internal services in the namespace,
  * pods and services of any other namespace, node networks and the
@@ -147,6 +157,26 @@ export function makeNetworkPolicy(statefulSetName, { ports = [] } = {}) {
     },
   ]
   egress.push(userPodsRule)
+
+  // The Traefik entry point on the public control-plane addresses: only
+  // the web ports are opened here. The internet rule below keeps
+  // excepting these addresses entirely, so every other port — notably
+  // the Kubernetes API on 6443 — remains unreachable.
+  const publicIngressRule = new k8s.V1NetworkPolicyEgressRule()
+  publicIngressRule.to = PUBLIC_INGRESS_IPS.map((ip) => {
+    const peer = new k8s.V1NetworkPolicyPeer()
+    const block = new k8s.V1IPBlock()
+    block.cidr = `${ip}/32`
+    peer.ipBlock = block
+    return peer
+  })
+  publicIngressRule.ports = PUBLIC_INGRESS_PORTS.map((port) => {
+    const policyPort = new k8s.V1NetworkPolicyPort()
+    policyPort.protocol = 'TCP'
+    policyPort.port = port
+    return policyPort
+  })
+  egress.push(publicIngressRule)
 
   // The public internet (cluster-internal ranges excluded, see above)
   const internetRule = new k8s.V1NetworkPolicyEgressRule()

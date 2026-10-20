@@ -75,9 +75,10 @@ describe('makeNetworkPolicy', () => {
     expect(policy.spec.ingress).toHaveLength(3)
   })
 
-  it('builds egress for DNS, user pods and the internet only', () => {
+  it('builds egress for DNS, user pods, the public ingress and the internet', () => {
     const policy = makeNetworkPolicy('sd-5', { ports })
-    const [dnsRule, userPodsRule, internetRule] = policy.spec.egress
+    const [dnsRule, userPodsRule, publicIngressRule, internetRule] =
+      policy.spec.egress
 
     expect(dnsRule.to[0]).toMatchObject({
       namespaceSelector: {
@@ -90,6 +91,18 @@ describe('makeNetworkPolicy', () => {
     expect(userPodsRule.to[0].podSelector.matchExpressions).toEqual([
       { key: 'app', operator: 'Exists' },
       { key: 'app', operator: 'NotIn', values: expect.any(Array) },
+    ])
+
+    // The Traefik entry point on the public control-plane addresses: web
+    // ports only, so the Kubernetes API (6443) stays unreachable
+    expect(
+      publicIngressRule.to.map((peer) => peer.ipBlock.cidr)
+    ).toEqual(['134.93.175.62/32', '134.93.175.63/32'])
+    expect(
+      publicIngressRule.ports.map((port) => [port.protocol, port.port])
+    ).toEqual([
+      ['TCP', 80],
+      ['TCP', 443],
     ])
 
     expect(internetRule.to[0].ipBlock.cidr).toBe('0.0.0.0/0')

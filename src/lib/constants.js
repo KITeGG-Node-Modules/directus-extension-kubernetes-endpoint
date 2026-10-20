@@ -26,6 +26,14 @@ export const INGRESS_SYSTEM_POD_LABELS = [
   { app: 'openwebui-ccl' },
 ]
 
+// Public addresses of the control-plane endpoint (hsm-kitegg-a/b.zdv.
+// uni-mainz.de). They host BOTH the Kubernetes API (6443) and the Traefik
+// ingress LoadBalancer (80/443). Egress to them is allowed on the web
+// ports only — the Kubernetes API stays unreachable (the internet egress
+// rule excepts these addresses entirely, see make-network-policy.js).
+export const PUBLIC_INGRESS_IPS = ['134.93.175.62', '134.93.175.63']
+export const PUBLIC_INGRESS_PORTS = [80, 443]
+
 // `app` label values of the system-internal services sharing the services
 // namespace. Used to exclude them from the "any user pod" selectors (as an
 // ingress source and as an egress destination) — user workloads must not

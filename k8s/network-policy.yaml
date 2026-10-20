@@ -10,9 +10,10 @@
 #   - Ingress: denied except the deployment's own replicas, the ingress
 #     path, the `jupyterhub` namespace, and other user deployments — always
 #     restricted to the declared service ports.
-#   - Egress: DNS, other user deployments' pods, and the public internet.
-#     System-internal services, other namespaces, node networks and the
-#     Kubernetes API are unreachable.
+#   - Egress: DNS, other user deployments' pods, the public internet and
+#     the Traefik entry point on the public control-plane addresses (web
+#     ports only). System-internal services, other namespaces, node
+#     networks and the Kubernetes API are unreachable.
 #
 # THIS manifest adds a second, admin-owned line of defense for every pod
 # whose `app` label is NOT one of the system-internal services — i.e.
@@ -152,7 +153,11 @@ spec:
     #   - 134.93.175.62/32, .63/32 -> PUBLIC control-plane addresses
     #                          (hsm-kitegg-a/b.zdv.uni-mainz.de); without
     #                          these the pods could reach the Kubernetes
-    #                          API over the internet
+    #                          API over the internet. The same addresses
+    #                          front the Traefik ingress LoadBalancer —
+    #                          the web ports are re-opened by the
+    #                          dedicated rule below; everything else
+    #                          (notably 6443) stays blocked.
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
@@ -166,3 +171,19 @@ spec:
               - 100.64.0.0/10
               - 134.93.175.62/32
               - 134.93.175.63/32
+    # The public Traefik entry point: the control-plane addresses also
+    # front the ingress LoadBalancer, and user workloads must be able to
+    # reach each other via their public URLs. Only the web ports are
+    # opened here; the `except` entries above keep these addresses blocked
+    # on every other port, so the Kubernetes API (6443) remains
+    # unreachable.
+    - to:
+        - ipBlock:
+            cidr: 134.93.175.62/32
+        - ipBlock:
+            cidr: 134.93.175.63/32
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 443

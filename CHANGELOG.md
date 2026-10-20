@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- User workloads can reach the Traefik ingress LoadBalancer again: the public control-plane addresses (`134.93.175.62/.63`) also front the ingress, so the per-deployment and hardening egress policies now allow TCP 80/443 to them explicitly while keeping every other port — notably the Kubernetes API on 6443 — blocked
+
 ### Changed
 
 - The deployment `status` no longer affects network access: `draft` (and every other state) is now reachable exactly like a published deployment — via the proxy/ingress path on the deployment's declared service ports, by other user deployments, and from the extra ingress namespaces. The `status` now only controls visibility in the services overview
