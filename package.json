@@ -1,5 +1,5 @@
 {
-  "name": "directus-extension-kubernetes-endpoint",
+  "name": "@kitegg/directus-extension-kubernetes-endpoint",
   "description": "Directus custom endpoint for deploying StatefulSets and attached resources to a Kubernetes cluster",
   "icon": "extension",
   "version": "2.0.0",
