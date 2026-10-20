@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- The deployment `status` no longer affects network access: `draft` (and every other state) is now reachable exactly like a published deployment — via the proxy/ingress path on the deployment's declared service ports, by other user deployments, and from the extra ingress namespaces. The `status` now only controls visibility in the services overview
+
+### Removed
+
+- The same-owner peer rules and the published-port carve-out in the per-deployment NetworkPolicies (both subsumed by the general ingress rules now that drafts are unrestricted)
+- The `DEPLOYMENT_PUBLIC_STATUSES` configuration and the owner-group resync machinery (`syncOwnerGroup`, per-deployment peer lists): the policies depend only on each deployment's own item (id and declared ports), so syncing the edited items is sufficient
+
 ## [2.0.0] - 2026-10-19
 
 ### Added

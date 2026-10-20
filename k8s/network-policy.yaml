@@ -7,9 +7,8 @@
 # `app: sd-<id>` label — a label present on all pods, existing ones
 # included, so no pod template change and no restart is ever needed):
 #
-#   - Ingress: denied except the deployment's own replicas, deployments of
-#     the same owners, and (for public deployments) the ingress path, the
-#     `jupyterhub` namespace, and other user deployments — always
+#   - Ingress: denied except the deployment's own replicas, the ingress
+#     path, the `jupyterhub` namespace, and other user deployments — always
 #     restricted to the declared service ports.
 #   - Egress: DNS, other user deployments' pods, and the public internet.
 #     System-internal services, other namespaces, node networks and the

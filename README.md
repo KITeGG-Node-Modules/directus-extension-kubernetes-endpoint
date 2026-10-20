@@ -79,20 +79,18 @@ Each deployment's policy enforces:
 
 - **Ingress:**
   - replicas of the deployment itself (any port),
-  - **deployments of the same owners** (`user_created` / `authors`), on the
-    deployment's **declared service ports** only,
-  - **public deployments** additionally: the ingress path (Traefik in
-    `traefik-v2` for direct routes, and the oauth2-proxy `service-proxy`
-    pods fronting `*.service.kitegg.hs-mainz.de`), the Open WebUI
-    instances (`PUBLIC_INGRESS_SYSTEM_POD_LABELS`), pods in the extra
-    ingress namespaces (`INGRESS_EXTRA_NAMESPACES`, default `jupyterhub`
-    — the hub and user notebooks reach published services directly), and
-    other user deployments — also on the declared ports only.
-  - A **published port** (`exposed_service` / `exposed_port`) is reachable
-    by the ingress path on that port only — for every deployment,
-    regardless of its visibility or access control (e.g. to preview a
-    draft via its published hostname). The Open WebUI instances can reach
-    it as well: the published port is the only requirement.
+  - **the ingress path** (Traefik in `traefik-v2` for direct routes, and
+    the oauth2-proxy `service-proxy` pods fronting
+    `*.service.kitegg.hs-mainz.de`), on the deployment's **declared
+    service ports** only,
+  - the **extra ingress namespaces** (`INGRESS_EXTRA_NAMESPACES`, default
+    `jupyterhub` — the hub and user notebooks reach published services
+    directly), the **Open WebUI instances** (`INGRESS_SYSTEM_POD_LABELS`)
+    and **other user deployments** — also on the declared ports only.
+
+  The Directus `status` of a deployment (e.g. `draft`) does not
+  participate in the policies: it only controls visibility in the
+  services overview, not network access.
 
   The wildcard domain has TWO entry points, and both work unchanged: the
   Traefik route above, and the NGINX TLS proxy (NodePort `:30443`, TLS
@@ -109,36 +107,27 @@ Each deployment's policy enforces:
   including the public control-plane addresses (`134.93.175.62/.63`),
   which are blocked explicitly.
 
-Which deployments are public is decided by the Directus `status` field of
-the `deployments` collection: every status listed in
-`DEPLOYMENT_PUBLIC_STATUSES` (default `published`) is publicly reachable;
-everything else — `draft`, restricted states, and deployments without a
-status — can only be reached by deployments of the same owners. Same-owner
-deployments connect via the headless
-service `sd-<id>.services.svc.cluster.local`, which resolves to the pod
-IPs (ClusterIPs are unreachable by the egress rules). Undeclared ports
+The Directus `status` of the `deployments` collection does not affect
+network access (see [Network isolation](#network-isolation)): every
+deployment is reachable from the ingress path on its declared service
+ports, and other user deployments can connect via the headless service
+`sd-<id>.services.svc.cluster.local`, which resolves to the pod IPs
+(ClusterIPs are unreachable by the egress rules). The `status` only
+controls visibility in the services overview. Undeclared ports
 (admin interfaces, debug endpoints) are never reachable from outside the
 deployment's replicas.
 
 **Keeping the policies in sync:** the policies are regenerated whenever a
-deployment is **deployed or deleted** via the extension endpoints, and —
-via the bundled Directus hook (`src/hooks/sync-deployments.js`) — whenever
-a `deployments` item is changed in Directus, so access-control edits are
-reflected without waiting for the next deploy:
+deployment is **deployed** via the extension endpoints, and — via the
+bundled Directus hook (`src/hooks/sync-deployments.js`) — whenever a
+`deployments` item is changed in Directus, so edits are reflected without
+waiting for the next deploy:
 
-- `status` (publishing/unpublishing), `exposed_service` / `exposed_port`
-  (publishing a port), `user_created` / `authors` (owner changes —
-  removed authors lose access), and port changes in the deployment YAML
-  trigger a debounced sync of exactly the edited deployments (peer lists
-  are recomputed from the full collection; cross-deployment access is
-  decided target-side).
-- Deleting a deployment item directly in Directus (bypassing the
-  extension's DELETE endpoint) triggers a full sync so no peer rule
-  survives the deleted deployment.
+- Port changes in the deployment YAML trigger a debounced sync of exactly
+  the edited deployments (each policy depends only on its own item).
 - A scheduled reconciliation (`*/10 * * * *`) runs a full sync as a
-  safety net for everything the item hooks cannot see — author changes
-  made directly on the M2M junction collection, out-of-band `kubectl`
-  edits, drift.
+  safety net for everything the item hooks cannot see — out-of-band
+  `kubectl` edits, drift.
 - `POST /kubernetes/network-policies/backfill` remains the manual
   fallback (e.g. after cluster restores or as part of the rollout).
 
@@ -197,8 +186,8 @@ are applied without touching any pod):
      https://<name>.service.kitegg.hs-mainz.de:30443
    ```
 
-   Both must answer (an auth redirect counts), and a draft deployment
-   without a published port must time out instead.
+   Both must answer (an auth redirect counts) on the declared service
+   ports.
 
 Maintenance: when a new system-internal service is added to the `services`
 namespace, add its `app` label value to `SYSTEM_APP_LABEL_VALUES`
@@ -329,11 +318,9 @@ The required payload for the service is:
 The values for `exposed_service`, `exposed_port` and `exposed_hostname` (must be a unique, alphanumeric string allowing
 only a dash as a special character) are optional and refer to the values in the YAML below.
 
-The deployment's Directus `status` decides its network visibility (see
-[Network isolation](#network-isolation)): deployments with status
-`published` are reachable from the ingress path on their declared service
-ports; all other states (e.g. `draft`) are only reachable by deployments of
-the same owners.
+The deployment's Directus `status` only controls its visibility in the
+services overview — it has no effect on network access (see
+[Network isolation](#network-isolation)).
 
 The YAML describing the deployment is structured as follows:
 
