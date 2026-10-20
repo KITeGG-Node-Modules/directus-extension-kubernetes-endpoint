@@ -1,11 +1,10 @@
 {
-  "name": "directus-extension-kubernetes-endpoint",
+  "name": "@kitegg/directus-extension-kubernetes-endpoint",
   "description": "Directus custom endpoint for deploying StatefulSets and attached resources to a Kubernetes cluster",
   "icon": "extension",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "license": "EUPL-1.2",
   "author": "Mainz University of Applied Sciences",
-  "private": true,
   "keywords": [
     "directus",
     "directus-extension",
