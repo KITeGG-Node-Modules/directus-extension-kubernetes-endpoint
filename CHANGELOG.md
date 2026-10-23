@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Cluster-side exception manifest `k8s/llp-litellm-allow.yaml`: allows the `llp` namespace to reach the LiteLLM proxy of the deployment `sd-a53262dd-2d9c-44c0-83e2-e00d01cb2420` (`http://sd-a53262dd-2d9c-44c0-83e2-e00d01cb2420-litellm.services:4000`, TCP 4000). Purely additive to the ingress isolation (which would otherwise deny `llp`) and scoped to this single deployment and port — adding `llp` to `INGRESS_EXTRA_NAMESPACES` would have opened every deployment instead
+
 ### Fixed
 
 - User workloads can reach the Traefik ingress entry point again: kube-proxy DNATs connections to the public ingress IP (`134.93.175.63`, also a control-plane address) into the Traefik pod *before* Calico evaluates the egress policy, so the destination seen by the policy is the Traefik pod IP on its pod ports (8000/8443) — cluster-internal and therefore dropped by the pod-CIDR exception. The per-deployment and hardening egress policies now allow egress to the `traefik-v2` namespace on those ports explicitly; the public-IP rule (TCP 80/443) stays for `.62` (the other cluster's ingress, no local DNAT) and keeps every other port — notably the Kubernetes API on 6443 — blocked

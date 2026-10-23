@@ -224,8 +224,16 @@ independently of the extension):
    live in `cache`, Traefik/nginx are the ingress path, tty-server
    reaches user pods via the API). Egress of the system services is
    untouched; apply last and smoke-test the entry points immediately.
+4. [`k8s/llp-litellm-allow.yaml`](k8s/llp-litellm-allow.yaml) — one-off
+   ingress exception: opens the LiteLLM service of the deployment
+   `sd-a53262dd-2d9c-44c0-83e2-e00d01cb2420` (port 4000) to the `llp`
+   namespace. Purely additive to the policies above (which would
+   otherwise deny `llp`); scoped to this single deployment and port.
+   The header documents the URL breakdown, the llp-side egress caveat
+   and the staleness risk if the deployment is re-created under a new
+   id.
 
-MAINTENANCE: all three manifests encode live cluster facts (CIDRs,
+MAINTENANCE: all four manifests encode live cluster facts (CIDRs,
 traffic routes, sizing). Re-verify them when services, routes or
 scales change — pointers are in each file's header.
 

@@ -1,0 +1,72 @@
+# One-off ingress exception for the LLP namespace (KITeGG Kubernetes
+# endpoint).
+#
+# PURPOSE: the LLP namespace must be able to call the LiteLLM proxy of the
+# deployment with the id a53262dd-2d9c-44c0-83e2-e00d01cb2420:
+#
+#   http://sd-a53262dd-2d9c-44c0-83e2-e00d01cb2420-litellm.services:4000
+#
+# URL breakdown (see src/endpoints/deploy-deployment.js): the host is a
+# DECLARED service of that deployment — `<statefulSetName>-<service name>`,
+# i.e. the `litellm` service of the StatefulSet
+# `sd-a53262dd-2d9c-44c0-83e2-e00d01cb2420` in the `services` namespace.
+# The pods carry the deployment's `app` label (set in
+# src/lib/make-stateful-set.js); services select pods by the same label.
+#
+# WHY A SEPARATE POLICY: the per-deployment NetworkPolicies (created by the
+# extension) plus the static hardening layer (k8s/network-policy.yaml)
+# deny all ingress to user workloads except the ingress path, the
+# jupyterhub namespace, the Open WebUI instances and other user
+# deployments. Adding `llp` to INGRESS_EXTRA_NAMESPACES
+# (src/lib/constants.js) would open EVERY deployment to the LLP namespace;
+# this manifest opens exactly this one deployment instead. NetworkPolicies
+# are purely additive, so this rule extends — never narrows — the existing
+# isolation.
+#
+# SCOPE / CAVEATS:
+#   - This opens the SERVICES-namespace side only (target ingress). If the
+#     llp namespace is ever given a default-deny EGRESS policy, a matching
+#     egress rule to these pods (TCP 4000) must be added there — do NOT
+#     add an Egress policy to llp while its pods have none: that would
+#     deny all their other egress.
+#   - The pods are reached by pod IP (kube-proxy DNATs the service ClusterIP
+#     before Calico evaluates the target's ingress policy), so the
+#     podSelector below matches in both the ClusterIP and headless-service
+#     cases.
+#   - STALENESS: the selector is the deployment's id. If the deployment is
+#     deleted and re-created under a different id, this policy matches
+#     nothing (fail closed) and must be updated.
+#
+# Verify the selector against the live cluster before applying:
+#   SVC=sd-a53262dd-2d9c-44c0-83e2-e00d01cb2420-litellm
+#   kubectl get svc -n services "$SVC" \
+#     -o jsonpath='{.spec.selector}{"\n"}{.spec.ports}{"\n"}'
+#
+# Smoke test after applying (from a pod in the llp namespace):
+#   HOST=sd-a53262dd-2d9c-44c0-83e2-e00d01cb2420-litellm.services
+#   curl -sS "http://${HOST}:4000/"
+#
+# ROLLBACK: kubectl delete -f k8s/llp-litellm-allow.yaml
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: llp-litellm-ingress-allow
+  namespace: services
+spec:
+  # The target deployment's pods (declared service `litellm` of
+  # sd-a53262dd-2d9c-44c0-83e2-e00d01cb2420)
+  podSelector:
+    matchLabels:
+      app: sd-a53262dd-2d9c-44c0-83e2-e00d01cb2420
+  policyTypes:
+    - Ingress
+  ingress:
+    # The whole llp namespace, on the LiteLLM proxy port only
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: llp
+      ports:
+        - protocol: TCP
+          port: 4000
