@@ -23,6 +23,13 @@
 # are purely additive, so this rule extends — never narrows — the existing
 # isolation.
 #
+# SPLIT: this manifest was split out of the former k8s/litellm-allow.yaml,
+# which additionally allowed the `prometheus` namespace. Prometheus access
+# is now covered namespace-wide by k8s/prometheus-allow.yaml (this
+# deployment included), so the prometheus entry here would be redundant.
+# Apply k8s/prometheus-allow.yaml BEFORE re-applying this manifest to
+# avoid a scraping gap for the LiteLLM target.
+#
 # SCOPE / CAVEATS:
 #   - This opens the SERVICES-namespace side only (target ingress). If the
 #     llp namespace is ever given a default-deny EGRESS policy, a matching
@@ -46,7 +53,7 @@
 #   HOST=sd-a53262dd-2d9c-44c0-83e2-e00d01cb2420-litellm.services
 #   curl -sS "http://${HOST}:4000/"
 #
-# ROLLBACK: kubectl delete -f k8s/litellm-allow.yaml
+# ROLLBACK: kubectl delete -f k8s/litellm-llp-allow.yaml
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -67,9 +74,6 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: llp
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: prometheus
       ports:
         - protocol: TCP
           port: 4000

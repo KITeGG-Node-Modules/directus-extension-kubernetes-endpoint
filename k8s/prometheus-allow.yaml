@@ -1,0 +1,91 @@
+# Namespace-wide monitoring ingress for the `prometheus` namespace
+# (KITeGG Kubernetes endpoint).
+#
+# PURPOSE: the Prometheus instance running in the `prometheus` namespace
+# must be able to DISCOVER and reach the services across the ENTIRE
+# `services` namespace — not just the single LiteLLM deployment the former
+# k8s/litellm-allow.yaml exception covered (that manifest was split into
+# k8s/litellm-llp-allow.yaml, LLP only, and this one).
+#
+# DISCOVERY vs REACHABILITY — two separate concerns, only the second is a
+# NetworkPolicy matter:
+#
+#   1. DISCOVERY (kubernetes_sd_config / ServiceMonitor / PodMonitor):
+#      Prometheus lists services, endpoints and pods through the Kubernetes
+#      API. That needs the Prometheus ServiceAccount to hold cluster-scoped
+#      list/get RBAC on services/endpoints/pods — provided out of the box
+#      by the monitoring stack (Prometheus Operator / kube-prometheus-stack)
+#      and NOT governed by this manifest. Names resolve through CoreDNS as
+#      `<svc>.services.svc.cluster.local`; CoreDNS reachability is egress of
+#      the prometheus namespace, likewise not covered here.
+#
+#   2. REACHABILITY (this manifest): the target-side ingress. Without it,
+#      discovery finds the targets but every scrape is dropped: the
+#      per-deployment policies (created by the extension), the hardening
+#      layer (k8s/network-policy.yaml) and the system-services protection
+#      (k8s/system-services-policy.yaml) deny ALL ingress to the namespace
+#      except the explicitly allowed paths. NetworkPolicies are purely
+#      additive, so this rule extends — never narrows — the existing
+#      isolation: ONLY the prometheus namespace gains access.
+#
+# SCOPE / CAVEATS:
+#   - Empty podSelector = EVERY pod in the `services` namespace: all user
+#     deployments AND the system-internal services (`cache`, `service-proxy`,
+#     `nginx`, `openwebui*`, `tty-server`). The system services are thereby
+#     re-opened to the prometheus namespace only — k8s/system-services-
+#     policy.yaml denied them to everyone else, and the two policies
+#     coexist additively. If scraping the system services is NOT wanted,
+#     replace the empty podSelector with a matchExpressions `NotIn` list
+#     (keep it in sync with the system services list in
+#     k8s/network-policy.yaml).
+#   - NO port restriction: metric/health endpoints are not standardized
+#     across deployments (LiteLLM 4000, exporters, sidecars...); Prometheus
+#     picks the port from discovery metadata and scrape annotations.
+#     Restricting ports here would silently drop scrapers.
+#   - Namespace-level source: the WHOLE prometheus namespace. If it ever
+#     hosts other tenants, add a podSelector for the actual Prometheus pods
+#     to the `from` entry.
+#   - Targets are reached by pod IP (kube-proxy DNATs the service ClusterIP
+#     before Calico evaluates the target's ingress policy), so the selector
+#     matches in both the ClusterIP and headless-service cases — with an
+#     empty podSelector this is trivially true.
+#   - This opens the SERVICES-namespace side only (target ingress). If the
+#     prometheus namespace is ever given a default-deny EGRESS policy,
+#     matching egress rules to these pods must be added there — do NOT add
+#     an Egress policy to prometheus while its pods have none: that would
+#     deny all its other egress.
+#   - ROLLOUT ORDER: apply this manifest BEFORE re-applying the trimmed
+#     k8s/litellm-llp-allow.yaml, so the prometheus -> LiteLLM flow is
+#     carried by this policy the moment the old one drops it (no scrape
+#     gap; NetworkPolicies are additive, applying early cannot break
+#     anything).
+#
+# Verify the namespace label against the live cluster before applying:
+#   kubectl get ns prometheus --show-labels
+#
+# Smoke test after applying (from a pod in the prometheus namespace):
+#   SVC=sd-a53262dd-2d9c-44c0-83e2-e00d01cb2420-litellm
+#   curl -sS "http://${SVC}.services.svc.cluster.local:4000/"
+#   ... and check the targets show `up` in the Prometheus UI.
+#
+# ROLLBACK: kubectl delete -f k8s/prometheus-allow.yaml
+# (falls back to the pre-split state for LLP only; ALL prometheus scraping
+# of the services namespace is denied again afterwards)
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: prometheus-ingress-allow
+  namespace: services
+spec:
+  # Every pod in the services namespace (see SCOPE above for the
+  # system-services implication and the NotIn tightening option)
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    # The whole prometheus namespace, on ALL ports (see SCOPE above)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: prometheus

@@ -41,18 +41,18 @@ default `services`). A ready-to-apply manifest is provided in
 
 Required verbs per resource (within the services namespace):
 
-| Resource                  | Verbs                                                | Used by                                                                  |
-| ------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------ |
-| `apps/statefulsets`       | `get`, `list`, `create`, `update`, `patch`, `delete` | deploy, re-deploy (`update`), restart hook (`patch`), state/info, delete |
-| `apps/statefulsets/scale` | `update`, `patch`                                    | scaling (`PATCH /deployments/:id?scale=…`)                               |
-| `services`                | `get`, `create`, `patch`                             | deploy (ports of an existing service are patched)                        |
-| `networking.k8s.io/networkpolicies` | `get`, `list`, `create`, `update`, `delete` | deploy (per-deployment ingress policy), delete                           |
-| `configmaps`              | `get`, `create`, `update`, `delete`                  | config endpoints, delete                                                 |
-| `secrets`                 | `get`, `create`, `update`, `delete`                  | secret endpoints, delete                                                 |
-| `persistentvolumeclaims`  | `list`, `delete`                                     | deployment info, delete                                                  |
-| `pods`                    | `list`, `delete`                                     | state/info/logs/events, delete pod                                       |
-| `pods/log`                | `get`                                                | pod logs                                                                 |
-| `events.k8s.io/events`    | `get`, `list`                                        | pod events                                                               |
+| Resource                            | Verbs                                                | Used by                                                                  |
+| ----------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------ |
+| `apps/statefulsets`                 | `get`, `list`, `create`, `update`, `patch`, `delete` | deploy, re-deploy (`update`), restart hook (`patch`), state/info, delete |
+| `apps/statefulsets/scale`           | `update`, `patch`                                    | scaling (`PATCH /deployments/:id?scale=…`)                               |
+| `services`                          | `get`, `create`, `patch`                             | deploy (ports of an existing service are patched)                        |
+| `networking.k8s.io/networkpolicies` | `get`, `list`, `create`, `update`, `delete`          | deploy (per-deployment ingress policy), delete                           |
+| `configmaps`                        | `get`, `create`, `update`, `delete`                  | config endpoints, delete                                                 |
+| `secrets`                           | `get`, `create`, `update`, `delete`                  | secret endpoints, delete                                                 |
+| `persistentvolumeclaims`            | `list`, `delete`                                     | deployment info, delete                                                  |
+| `pods`                              | `list`, `delete`                                     | state/info/logs/events, delete pod                                       |
+| `pods/log`                          | `get`                                                | pod logs                                                                 |
+| `events.k8s.io/events`              | `get`, `list`                                        | pod events                                                               |
 
 > **Note:** verbs are evaluated per resource; permissions on `statefulsets`
 > do **not** imply permissions on the `statefulsets/scale` subresource. A
@@ -78,6 +78,7 @@ therefore never changes a pod template and never restarts anything.
 Each deployment's policy enforces:
 
 - **Ingress:**
+
   - replicas of the deployment itself (any port),
   - **the ingress path** (Traefik in `traefik-v2` for direct routes, and
     the oauth2-proxy `service-proxy` pods fronting
@@ -100,6 +101,7 @@ Each deployment's policy enforces:
   pod, which is the allowed ingress-path peer. If NGINX ever proxied to
   user services directly (not via the service-proxy), it would need to be
   added to that peer rule.
+
 - **Egress:** DNS, other user deployments' pods, and the public internet.
   System-internal services in the namespace (`cache`, `nginx`,
   `openwebui*`, `service-proxy`, `tty-server`), pods and services of any
@@ -109,7 +111,7 @@ Each deployment's policy enforces:
   public addresses are reachable on the web ports (TCP 80/443), and the
   Traefik pods (namespace `traefik-v2`) on their entrypoint ports
   (TCP 8000/8443) — kube-proxy DNATs connections to the public ingress IP
-  into the Traefik pod *before* the egress policy is evaluated, so the
+  into the Traefik pod _before_ the egress policy is evaluated, so the
   namespace rule is what actually carries that traffic. Every other port
   (notably the Kubernetes API on 6443) stays blocked on those addresses.
 
@@ -210,11 +212,11 @@ independently of the extension):
    (Audit-mode annotations land in the API server audit log, which this
    cluster does not run — the header documents the practical check.)
 2. [`k8s/resource-quota.yaml`](k8s/resource-quota.yaml) — ResourceQuota
-   + LimitRange bounding the namespace's total compute (sized at ~+50%
-   over the measured ceiling) and object counts. The LimitRange is
-   required next to the quota: it defaults CPU/memory requests for
-   pods that declare none (the extension sets limits, requests only for
-   GPUs). Applies to new pods only.
+   - LimitRange bounding the namespace's total compute (sized at ~+50%
+     over the measured ceiling) and object counts. The LimitRange is
+     required next to the quota: it defaults CPU/memory requests for
+     pods that declare none (the extension sets limits, requests only for
+     GPUs). Applies to new pods only.
 3. [`k8s/system-services-policy.yaml`](k8s/system-services-policy.yaml)
    — ingress protection for the system-internal services (`cache`,
    `service-proxy`, `nginx`, `openwebui*`, `tty-server`), closing the
@@ -224,16 +226,26 @@ independently of the extension):
    live in `cache`, Traefik/nginx are the ingress path, tty-server
    reaches user pods via the API). Egress of the system services is
    untouched; apply last and smoke-test the entry points immediately.
-4. [`k8s/litellm-allow.yaml`](k8s/litellm-allow.yaml) — one-off
+4. [`k8s/litellm-llp-allow.yaml`](k8s/litellm-llp-allow.yaml) — one-off
    ingress exception: opens the LiteLLM service of the deployment
-   `sd-a53262dd-2d9c-44c0-83e2-e00d01cb2420` (port 4000) to the `llp` and `prometheus` 
+   `sd-a53262dd-2d9c-44c0-83e2-e00d01cb2420` (port 4000) to the `llp`
    namespace. Purely additive to the policies above (which would
-   otherwise deny `llp` and `prometheus`); scoped to this single deployment and port.
+   otherwise deny `llp`); scoped to this single deployment and port.
    The header documents the URL breakdown, the llp-side egress caveat
    and the staleness risk if the deployment is re-created under a new
    id.
+5. [`k8s/prometheus-allow.yaml`](k8s/prometheus-allow.yaml) — monitoring
+   ingress: makes every pod in the `services` namespace (user deployments
+   and the system-internal services alike) reachable from the
+   `prometheus` namespace on all ports, so Prometheus can discover and
+   scrape the whole namespace. Discovery itself (kubernetes_sd RBAC,
+   CoreDNS) is egress/API business of the prometheus namespace; the
+   header documents that split, the scope (including the system-services
+   implication and the NotIn tightening option) and the rollout order
+   against item 4 — apply this manifest first so the prometheus →
+   LiteLLM flow moves over without a scrape gap.
 
-MAINTENANCE: all four manifests encode live cluster facts (CIDRs,
+MAINTENANCE: all five manifests encode live cluster facts (CIDRs,
 traffic routes, sizing). Re-verify them when services, routes or
 scales change — pointers are in each file's header.
 
@@ -260,12 +272,12 @@ fields). Changes are part of the pod template, so they apply on each
 deployment's **next redeploy** — running pods are never restarted by a
 hardening rollout:
 
-| Default | Opt-out (per container, in the YAML) |
-|---|---|
-| No service account token mounted (`automountServiceAccountToken: false`) | none — user pods never reach the Kubernetes API (blocked by egress policies), the token would only be theft bait |
-| Seccomp profile `RuntimeDefault` | `seccomp: false` (e.g. for `strace`/`perf`) |
+| Default                                                                        | Opt-out (per container, in the YAML)                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No service account token mounted (`automountServiceAccountToken: false`)       | none — user pods never reach the Kubernetes API (blocked by egress policies), the token would only be theft bait                                                                                                                                                                                                                          |
+| Seccomp profile `RuntimeDefault`                                               | `seccomp: false` (e.g. for `strace`/`perf`)                                                                                                                                                                                                                                                                                               |
 | Linux capabilities: `drop: ['ALL']`, `add: ['NET_BIND_SERVICE', ...requested]` | `capabilities: [...]` may request further capabilities from `ALLOWED_CAPABILITIES` (`src/lib/constants.js` — the Docker/containerd default set: `CHOWN`, `SETUID`, `NET_RAW`, …). `NET_BIND_SERVICE` is granted implicitly so images serving on port 80/443 keep working; `SYS_ADMIN`, `NET_ADMIN`, `SYS_PTRACE` etc. are never available |
-| `runAsNonRoot: true` | `runAsRoot: true` |
+| `runAsNonRoot: true`                                                           | `runAsRoot: true`                                                                                                                                                                                                                                                                                                                         |
 
 Images must come from an allowed registry
 (`DEFAULT_IMAGE_REGISTRIES` in `src/lib/constants.js`: docker.io,
@@ -311,7 +323,7 @@ deploy time with the allowed list in the error message.
   `fsGroup` instead of `CHOWN`).
 
 - Known-impossible requests, so you can answer them quickly: mounting
-  external storage via FUSE (`rclone`, `sshfs`) needs `SYS_ADMIN` *and*
+  external storage via FUSE (`rclone`, `sshfs`) needs `SYS_ADMIN` _and_
   a `/dev/fuse` device passthrough, which the deployment model does not
   offer — use PVCs/volumes instead; debuggers/profilers attaching to
   other processes (`SYS_PTRACE`) are not allowed — use logs and the pod
