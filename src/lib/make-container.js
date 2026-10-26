@@ -1,5 +1,10 @@
 import k8s from '@kubernetes/client-node'
-import { DEFAULT_CPU, DEFAULT_MEMORY_GI, NUMBER_UNITS } from './constants.js'
+import {
+  ALLOWED_CAPABILITIES,
+  DEFAULT_CPU,
+  DEFAULT_MEMORY_GI,
+  NUMBER_UNITS,
+} from './constants.js'
 import { formatQuantity } from './quantity.js'
 
 export function makeContainer(c, servicePayloads, statefulSetName) {
@@ -19,36 +24,30 @@ export function makeContainer(c, servicePayloads, statefulSetName) {
     container.securityContext.seccompProfile.type = 'RuntimeDefault'
   }
 
-  // Capabilities: drop ALL, add back the Docker/containerd default set —
-  // requested by the user or NET_BIND_SERVICE implicitly. NET_BIND_SERVICE
-  // is granted by default: serving on a low port (<1024) only affects the
-  // pod's own IP and is the most common image default (port 80/443 web
-  // UIs) — without it those crash-loop on redeploy. Everything beyond the
-  // default set (SYS_ADMIN, ...) was never available on plain Docker and
-  // stays unavailable. Requests are validated in validate-container.js.
+  // Capabilities: drop ALL, grant back the Docker/containerd default set
+  // (ALLOWED_CAPABILITIES in constants.js) implicitly. Standard images are
+  // built for plain Docker, where this set is implicit — without it they
+  // crash-loop at startup (e.g. the official nginx image needs CHOWN,
+  // SETUID and SETGID to chown its cache directories and drop privileges).
+  // Everything beyond the Docker default set (SYS_ADMIN, NET_ADMIN, ...)
+  // was never available on plain Docker and stays unavailable. If an admin
+  // extends ALLOWED_CAPABILITIES, users may request the extras explicitly
+  // via the container's `capabilities` field — validated in
+  // validate-container.js and added on top of the implicit grant here.
   container.securityContext.capabilities = new k8s.V1Capabilities()
   container.securityContext.capabilities.drop = ['ALL']
   const requested = Array.isArray(c.capabilities) ? c.capabilities : []
   container.securityContext.capabilities.add = [
-    'NET_BIND_SERVICE',
-    ...requested.filter((capability) => capability !== 'NET_BIND_SERVICE'),
+    ...ALLOWED_CAPABILITIES,
+    ...requested.filter(
+      (capability) => !ALLOWED_CAPABILITIES.includes(capability)
+    ),
   ]
 
-  // Non-root is OPT-IN: most images ship a root default user, and forcing
-  // runAsNonRoot on them rejected the pod at admission ('container has
-  // runAsNonRoot and image will run as root'). Images that need it can set
-  // `runAsNonRoot: true` (visible in the YAML, easy to audit); an explicit
-  // `user` overrides the image default regardless.
-  //
-  // Backwards compatibility: deployments written for the earlier
-  // non-root-by-default behavior keep working unchanged. `runAsRoot: true`
-  // runs as root (what the opt-out always achieved), and `runAsRoot: false`
-  // keeps the non-root default it explicitly affirmed. The new key wins if
-  // both are set.
-  const nonRoot =
-    c.runAsNonRoot === true ||
-    (c.runAsNonRoot === undefined && c.runAsRoot === false)
-  if (nonRoot) {
+  // Non-root by default: images whose entrypoint needs root can opt out
+  // with `runAsRoot: true` (visible in the YAML, easy to audit); an
+  // explicit `user`/`group` overrides the image default regardless.
+  if (c.runAsRoot !== true) {
     container.securityContext.runAsNonRoot = true
   }
 

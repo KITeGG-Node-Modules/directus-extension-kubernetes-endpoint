@@ -188,11 +188,8 @@ export function validateContainer(
     args: {
       type: 'array',
     },
-    runAsNonRoot: {
-      type: 'boolean',
-    },
-    // legacy opt-out key from the non-root-by-default era; still honored
-    // by make-container (see there) so existing deployments keep working
+    // opt-out key from the non-root-by-default era; honored by
+    // make-container (see there)
     runAsRoot: {
       type: 'boolean',
     },

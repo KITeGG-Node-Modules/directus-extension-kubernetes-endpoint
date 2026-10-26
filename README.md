@@ -272,20 +272,17 @@ fields). Changes are part of the pod template, so they apply on each
 deployment's **next redeploy** — running pods are never restarted by a
 hardening rollout:
 
-| Default                                                                        | Opt-out (per container, in the YAML)                                                                                                                                                                                                                                                                                                      |
-| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| No service account token mounted (`automountServiceAccountToken: false`)       | none — user pods never reach the Kubernetes API (blocked by egress policies), the token would only be theft bait                                                                                                                                                                                                                          |
-| Seccomp profile `RuntimeDefault`                                               | `seccomp: false` (e.g. for `strace`/`perf`)                                                                                                                                                                                                                                                                                               |
-| Linux capabilities: `drop: ['ALL']`, `add: ['NET_BIND_SERVICE', ...requested]` | `capabilities: [...]` may request further capabilities from `ALLOWED_CAPABILITIES` (`src/lib/constants.js` — the Docker/containerd default set: `CHOWN`, `SETUID`, `NET_RAW`, …). `NET_BIND_SERVICE` is granted implicitly so images serving on port 80/443 keep working; `SYS_ADMIN`, `NET_ADMIN`, `SYS_PTRACE` etc. are never available |
+| Default                                                                                       | Opt-out (per container, in the YAML)                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No service account token mounted (`automountServiceAccountToken: false`)                      | none — user pods never reach the Kubernetes API (blocked by egress policies), the token would only be theft bait                                                                                                                                                                                                                                                                                                                                                                                |
+| Seccomp profile `RuntimeDefault`                                                              | `seccomp: false` (e.g. for `strace`/`perf`)                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Linux capabilities: `drop: ['ALL']`, `add: [the Docker/containerd default set, ...requested]` | The Docker/containerd default capability set (`ALLOWED_CAPABILITIES` in `src/lib/constants.js`: `CHOWN`, `SETUID`, `SETGID`, `NET_BIND_SERVICE`, `NET_RAW`, …) is granted implicitly so standard images (built for plain Docker) keep working — e.g. nginx needs `CHOWN`/`SETUID`/`SETGID` for its cache directories and privilege drop. `capabilities: [...]` may request extras an admin has added to `ALLOWED_CAPABILITIES`; `SYS_ADMIN`, `NET_ADMIN`, `SYS_PTRACE` etc. are never available |
 
-Containers run with the image's default user — usually root, since most
-images need it to start. Images that support a non-root user can enforce
-it per container with `runAsNonRoot: true` (the pod is then rejected at
-admission if the image's default user is root); an explicit `user`/
-`group` in the YAML overrides the image default regardless. Deployments
-written for the previous non-root-by-default behavior keep working:
-`runAsRoot: true` still runs as root and `runAsRoot: false` still keeps
-the non-root default.
+Containers run as non-root by default — the pod is rejected at admission
+if an image's default user is root. Images whose entrypoint needs root
+can opt out per container with `runAsRoot: true` (visible in the YAML,
+easy to audit); an explicit `user`/`group` in the YAML overrides the
+image default regardless.
 
 Images must come from an allowed registry
 (`DEFAULT_IMAGE_REGISTRIES` in `src/lib/constants.js`: docker.io,
@@ -303,17 +300,17 @@ deploy time with the allowed list in the error message.
   start full and shrink as users redeploy):
 
   ```sh
-  # containers opting into non-root (runAsNonRoot: true)
+  # containers running as root (runAsRoot: true opt-outs)
   kubectl get sts -n services -o json | jq -r '
     .items[] | .metadata.name as $sts |
     .spec.template.spec.containers[]?
-    | select(.securityContext.runAsNonRoot == true)
+    | select(.securityContext.runAsNonRoot == null)
     | "\($sts)/\(.name)"'
   # containers with capabilities beyond the default grant
   kubectl get sts -n services -o json | jq -r '
     .items[] | .metadata.name as $sts |
     .spec.template.spec.containers[]?
-    | select(((.securityContext.capabilities.add // []) - ["NET_BIND_SERVICE"]) | length > 0)
+    | select(((.securityContext.capabilities.add // []) - ["AUDIT_WRITE","CHOWN","DAC_OVERRIDE","FOWNER","FSETID","KILL","MKNOD","NET_BIND_SERVICE","NET_RAW","SETFCAP","SETGID","SETPCAP","SETUID","SYS_CHROOT"]) | length > 0)
     | "\($sts)/\(.name)"'
   # containers without the seccomp profile / with the token mounted
   kubectl get sts -n services -o json | jq -r '
@@ -326,9 +323,10 @@ deploy time with the allowed list in the error message.
     | .metadata.name'
   ```
 
-- To allow a capability that is not in the default set, add it to
+- To allow a capability that is not in the Docker default grant, add it to
   `ALLOWED_CAPABILITIES`, rebuild and redeploy the extension — it takes
-  effect on the requesting deployment's next redeploy. Prefer builder
+  effect on the requesting deployment's next redeploy (users must also
+  request it via the container's `capabilities` field). Prefer builder
   alternatives where they exist (volume ownership via `fsUser`/
   `fsGroup` instead of `CHOWN`).
 
@@ -388,11 +386,12 @@ containers:
     changeGroupOnMismatch: true # Optional
 
     # Container hardening (seccomp and capabilities are on by default)
-    runAsNonRoot: false # true: require the image's default user to be non-root (off by default; most images run as root)
-    runAsRoot: false # legacy key, still honored: true runs as root, false keeps the non-root default
+    runAsRoot: false # true: run with the image's default user (opt-out; the pod runs non-root by default and is rejected at admission if the image's default user is root)
     seccomp: true # false: disable the default seccomp profile (e.g. for strace/perf)
-    capabilities: ['CHOWN'] # extra capabilities beyond the drop of ALL;
-    # NET_BIND_SERVICE is always granted so images serving on port 80/443 keep working
+    capabilities: [] # extra capabilities beyond the implicit Docker default
+    # grant (CHOWN, SETUID, SETGID, NET_BIND_SERVICE, NET_RAW, ... — standard
+    # images keep working without this); only needed if an admin extends
+    # ALLOWED_CAPABILITIES
     # Images must come from an allowed registry (docker.io, ghcr.io, quay.io,
     # nvcr.io, mcr.microsoft.com, registry.kitegg.de, registry.motionbank.org;
     # IMAGE_REGISTRY_ALLOWLIST env overrides, '*' disables the check)

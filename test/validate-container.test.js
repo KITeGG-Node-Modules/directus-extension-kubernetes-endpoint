@@ -136,13 +136,9 @@ describe('validateContainer', () => {
 
   it('rejects non-boolean hardening flags', () => {
     const base = { name: 'app', image: 'app' }
-    expect(validateContainer({ ...base, runAsNonRoot: true })).toEqual([])
     expect(validateContainer({ ...base, runAsRoot: true })).toEqual([])
     expect(validateContainer({ ...base, runAsRoot: false })).toEqual([])
     expect(validateContainer({ ...base, seccomp: false })).toEqual([])
-    expect(
-      validateContainer({ ...base, runAsNonRoot: 'yes' }).length
-    ).toBeGreaterThan(0)
     expect(
       validateContainer({ ...base, runAsRoot: 'yes' }).length
     ).toBeGreaterThan(0)

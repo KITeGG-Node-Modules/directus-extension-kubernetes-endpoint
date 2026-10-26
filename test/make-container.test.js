@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { makeContainer } from '../src/lib/make-container.js'
+import { ALLOWED_CAPABILITIES } from '../src/lib/constants.js'
 
 describe('makeContainer', () => {
   it('always sets cpu/memory limits, even without gpu', () => {
@@ -47,67 +48,60 @@ describe('makeContainer', () => {
 
   it('hardens the security context by default', () => {
     const container = makeContainer({ name: 'app', image: 'app' }, [])
-    // non-root is opt-in: images with a root default user must keep working
-    expect(container.securityContext.runAsNonRoot).toBeUndefined()
+    // non-root by default, matching plain-Docker-era deployments' security
+    // posture (images needing root must opt out via runAsRoot: true)
+    expect(container.securityContext.runAsNonRoot).toBe(true)
     expect(container.securityContext.allowPrivilegeEscalation).toBe(false)
     expect(container.securityContext.seccompProfile.type).toBe('RuntimeDefault')
     expect(container.securityContext.capabilities.drop).toEqual(['ALL'])
-    expect(container.securityContext.capabilities.add).toEqual([
-      'NET_BIND_SERVICE',
-    ])
+    // the Docker/containerd default set is granted implicitly, so standard
+    // images (e.g. nginx: chown cache dirs, setuid/setgid to nginx) work
+    expect(container.securityContext.capabilities.add).toEqual(
+      ALLOWED_CAPABILITIES
+    )
+    expect(ALLOWED_CAPABILITIES).toContain('CHOWN')
+    expect(ALLOWED_CAPABILITIES).toContain('NET_BIND_SERVICE')
   })
 
-  it('opts into non-root and out of seccomp per container', () => {
+  it('runs non-root by default and opts out of seccomp per container', () => {
     const root = makeContainer(
       { name: 'app', image: 'app', seccomp: false },
       []
     )
-    expect(root.securityContext.runAsNonRoot).toBeUndefined()
+    expect(root.securityContext.runAsNonRoot).toBe(true)
     expect(root.securityContext.seccompProfile).toBeUndefined()
 
-    // non-root opt-in and an explicit user are compatible
-    const user = makeContainer(
-      { name: 'app', image: 'app', runAsNonRoot: true, user: 1000 },
-      []
-    )
+    // non-root default and an explicit user are compatible
+    const user = makeContainer({ name: 'app', image: 'app', user: 1000 }, [])
     expect(user.securityContext.runAsNonRoot).toBe(true)
     expect(user.securityContext.runAsUser).toBe(1000)
   })
 
-  it('keeps the legacy runAsRoot key working', () => {
-    // old opt-out: still runs as root
+  it('opts out of non-root with runAsRoot: true', () => {
     const root = makeContainer(
       { name: 'app', image: 'app', runAsRoot: true },
       []
     )
     expect(root.securityContext.runAsNonRoot).toBeUndefined()
 
-    // old explicit affirmation of the non-root default: still non-root
+    // an explicit false affirms the default: still non-root
     const nonRoot = makeContainer(
       { name: 'app', image: 'app', runAsRoot: false },
       []
     )
     expect(nonRoot.securityContext.runAsNonRoot).toBe(true)
-
-    // the new key wins when both are set
-    const both = makeContainer(
-      { name: 'app', image: 'app', runAsNonRoot: false, runAsRoot: false },
-      []
-    )
-    expect(both.securityContext.runAsNonRoot).toBeUndefined()
   })
 
-  it('adds requested capabilities on top of the drop of ALL', () => {
+  it('adds requested capabilities on top of the drop of ALL without duplicating the default grant', () => {
     const container = makeContainer(
       { name: 'app', image: 'app', capabilities: ['CHOWN', 'SETUID'] },
       []
     )
     expect(container.securityContext.capabilities.drop).toEqual(['ALL'])
-    expect(container.securityContext.capabilities.add).toEqual([
-      'NET_BIND_SERVICE',
-      'CHOWN',
-      'SETUID',
-    ])
+    // CHOWN and SETUID are part of the implicit Docker default grant
+    expect(container.securityContext.capabilities.add).toEqual(
+      ALLOWED_CAPABILITIES
+    )
   })
 
   it('does not duplicate NET_BIND_SERVICE when requested explicitly', () => {
@@ -115,9 +109,9 @@ describe('makeContainer', () => {
       { name: 'app', image: 'app', capabilities: ['NET_BIND_SERVICE'] },
       []
     )
-    expect(container.securityContext.capabilities.add).toEqual([
-      'NET_BIND_SERVICE',
-    ])
+    expect(container.securityContext.capabilities.add).toEqual(
+      ALLOWED_CAPABILITIES
+    )
   })
 
   it('maps secret and config references', () => {

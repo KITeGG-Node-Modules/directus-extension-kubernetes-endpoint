@@ -41,7 +41,7 @@
 #
 # NOTE: user containers are additionally hardened by the extension
 # itself (no service account token, RuntimeDefault seccomp, dropped
-# capabilities; non-root is a per-container opt-in) — see README
+# capabilities, runAsNonRoot with a runAsRoot opt-out) — see README
 # "Container hardening". This manifest protects against the deploy
 # path being bypassed entirely.
 ---
