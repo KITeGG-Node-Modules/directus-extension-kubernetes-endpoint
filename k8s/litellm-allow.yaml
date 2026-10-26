@@ -46,12 +46,12 @@
 #   HOST=sd-a53262dd-2d9c-44c0-83e2-e00d01cb2420-litellm.services
 #   curl -sS "http://${HOST}:4000/"
 #
-# ROLLBACK: kubectl delete -f k8s/llp-litellm-allow.yaml
+# ROLLBACK: kubectl delete -f k8s/litellm-allow.yaml
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: llp-litellm-ingress-allow
+  name: litellm-ingress-allow
   namespace: services
 spec:
   # The target deployment's pods (declared service `litellm` of
@@ -67,6 +67,9 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: llp
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: prometheus
       ports:
         - protocol: TCP
           port: 4000

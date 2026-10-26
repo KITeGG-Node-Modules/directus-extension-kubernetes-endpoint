@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- Cluster-side exception manifest `k8s/llp-litellm-allow.yaml`: allows the `llp` namespace to reach the LiteLLM proxy of the deployment `sd-a53262dd-2d9c-44c0-83e2-e00d01cb2420` (`http://sd-a53262dd-2d9c-44c0-83e2-e00d01cb2420-litellm.services:4000`, TCP 4000). Purely additive to the ingress isolation (which would otherwise deny `llp`) and scoped to this single deployment and port — adding `llp` to `INGRESS_EXTRA_NAMESPACES` would have opened every deployment instead
+- Cluster-side exception manifest `k8s/litellm-allow.yaml`: allows the `llp` and `prometheus` namespaces to reach the LiteLLM proxy of the deployment `sd-a53262dd-2d9c-44c0-83e2-e00d01cb2420` (`http://sd-a53262dd-2d9c-44c0-83e2-e00d01cb2420-litellm.services:4000`, TCP 4000). Purely additive to the ingress isolation (which would otherwise deny `llp`) and scoped to this single deployment and port — adding `llp` to `INGRESS_EXTRA_NAMESPACES` would have opened every deployment instead
 
 ### Fixed
 
