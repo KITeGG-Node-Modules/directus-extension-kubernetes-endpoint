@@ -576,6 +576,15 @@ To delete a deployment and all associated resources:
 DELETE /kubernetes/deployments/<service ID>
 ```
 
+**Deleting the Directus item also undeploys:** a bundled hook
+(`src/hooks/undeploy-on-delete.js`) listens for `deployments.items.delete`
+and runs the same cleanup as this endpoint the moment the item is removed —
+item deletion alone is therefore enough to fully remove a service. If the
+cleanup fails, the item deletion is aborted so nothing is left behind
+silently; both the cleanup and the deletion are idempotent and can simply
+be retried. The endpoint above remains for undeploying a service without
+deleting its item.
+
 ### Getting logs for a deployment's pod
 
 To return a Pod's log:

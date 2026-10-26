@@ -1,13 +1,10 @@
 import { getKubernetesClient } from './lib/get-kubernetes-client.js'
+import { isNotFound } from './lib/is-not-found.js'
 import k8s from '@kubernetes/client-node'
 import { getDeploymentName } from './lib/util.js'
 import { isVolumeClaimOf } from './lib/util.js'
 import { servicesNamespace } from './lib/config.js'
 import { APP_LABEL_KEY } from './lib/constants.js'
-
-function isNotFound(err) {
-  return err?.statusCode === 404 || err?.body?.code === 404
-}
 
 /**
  * List resources carrying the deployment label and delete each one.

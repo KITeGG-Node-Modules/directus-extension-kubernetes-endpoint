@@ -1,56 +1,61 @@
 {
-  "name": "@kitegg/directus-extension-kubernetes-endpoint",
-  "description": "Directus custom endpoint for deploying StatefulSets and attached resources to a Kubernetes cluster",
-  "icon": "extension",
-  "version": "2.0.1",
-  "license": "EUPL-1.2",
-  "author": "Mainz University of Applied Sciences",
-  "keywords": [
-    "directus",
-    "directus-extension",
-    "directus-custom-endpoint"
-  ],
-  "type": "module",
-  "directus:extension": {
-    "type": "bundle",
-    "path": {
-      "app": "dist/app.js",
-      "api": "dist/index.js"
-    },
-    "entries": [
-      {
-        "type": "endpoint",
-        "name": "kubernetes",
-        "source": "src/index.js"
-      },
-      {
-        "type": "hook",
-        "name": "kubernetes-sync",
-        "source": "src/hooks/sync-deployments.js"
-      }
-    ],
-    "host": "^10.3.4"
-  },
-  "scripts": {
-    "build": "directus-extension build",
-    "dev": "directus-extension build -w --no-minify",
-    "link": "directus-extension link",
-    "format": "prettier -w src/",
-    "lint": "eslint src/ test/",
-    "test": "vitest run"
-  },
-  "devDependencies": {
-    "@directus/extensions-sdk": "10.3.4",
-    "eslint": "^9.39.5",
-    "globals": "^17.13.0",
-    "prettier": "^3.2.5",
-    "vitest": "^5.0.4"
-  },
-  "dependencies": {
-    "@kubernetes/client-node": "0.18.1",
-    "kitegg-directus-extension-common": "github:KITeGG-Node-Modules/kitegg-directus-extension-common#b62cf971c7d3fafa03239a967522c0663c855226",
-    "slugify": "^1.6.6",
-    "validate.js": "^0.13.1",
-    "yaml": "^2.4.1"
-  }
+	"name": "@kitegg/directus-extension-kubernetes-endpoint",
+	"description": "Directus custom endpoint for deploying StatefulSets and attached resources to a Kubernetes cluster",
+	"icon": "extension",
+	"version": "2.0.1",
+	"license": "EUPL-1.2",
+	"author": "Mainz University of Applied Sciences",
+	"keywords": [
+		"directus",
+		"directus-extension",
+		"directus-custom-endpoint"
+	],
+	"type": "module",
+	"directus:extension": {
+		"type": "bundle",
+		"path": {
+			"app": "dist/app.js",
+			"api": "dist/index.js"
+		},
+		"entries": [
+			{
+				"type": "endpoint",
+				"name": "kubernetes",
+				"source": "src/index.js"
+			},
+			{
+				"type": "hook",
+				"name": "kubernetes-sync",
+				"source": "src/hooks/sync-deployments.js"
+			},
+			{
+				"type": "hook",
+				"name": "kubernetes-undeploy",
+				"source": "src/hooks/undeploy-on-delete.js"
+			}
+		],
+		"host": "^10.3.4"
+	},
+	"scripts": {
+		"build": "directus-extension build",
+		"dev": "directus-extension build -w --no-minify",
+		"link": "directus-extension link",
+		"format": "prettier -w src/",
+		"lint": "eslint src/ test/",
+		"test": "vitest run"
+	},
+	"devDependencies": {
+		"@directus/extensions-sdk": "10.3.4",
+		"eslint": "^9.39.5",
+		"globals": "^17.13.0",
+		"prettier": "^3.2.5",
+		"vitest": "^5.0.4"
+	},
+	"dependencies": {
+		"@kubernetes/client-node": "0.18.1",
+		"kitegg-directus-extension-common": "github:KITeGG-Node-Modules/kitegg-directus-extension-common#b62cf971c7d3fafa03239a967522c0663c855226",
+		"slugify": "^1.6.6",
+		"validate.js": "^0.13.1",
+		"yaml": "^2.4.1"
+	}
 }

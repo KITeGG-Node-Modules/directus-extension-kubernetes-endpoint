@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Deleting a `deployments` item now undeploys its cluster resources first: a bundled hook (`src/hooks/undeploy-on-delete.js`) listens for `deployments.items.delete` and runs the same idempotent cleanup as the undeploy endpoint (StatefulSet, services, volume claims including unlabeled ones, secrets, config maps, NetworkPolicy), aborting the deletion when the cleanup fails so nothing is left behind silently and a failed deletion can simply be retried. Item deletion is therefore self-contained — callers no longer need to undeploy separately first (the frontend delete dialog used to, and child deployments removed through the decouple/delete flow leaked their resources entirely). The undeploy endpoint itself stays for stopping a service without deleting its item; the shared 404 check was extracted to `src/lib/is-not-found.js`
 - The deployment `status` no longer affects network access: `draft` (and every other state) is now reachable exactly like a published deployment — via the proxy/ingress path on the deployment's declared service ports, by other user deployments, and from the extra ingress namespaces. The `status` now only controls visibility in the services overview
 
 ### Removed
