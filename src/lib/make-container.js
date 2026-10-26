@@ -34,9 +34,21 @@ export function makeContainer(c, servicePayloads, statefulSetName) {
     ...requested.filter((capability) => capability !== 'NET_BIND_SERVICE'),
   ]
 
-  // Non-root by default: images whose entrypoint needs root can opt out
-  // with `runAsRoot: true` (visible in the YAML, easy to audit)
-  if (c.runAsRoot !== true) {
+  // Non-root is OPT-IN: most images ship a root default user, and forcing
+  // runAsNonRoot on them rejected the pod at admission ('container has
+  // runAsNonRoot and image will run as root'). Images that need it can set
+  // `runAsNonRoot: true` (visible in the YAML, easy to audit); an explicit
+  // `user` overrides the image default regardless.
+  //
+  // Backwards compatibility: deployments written for the earlier
+  // non-root-by-default behavior keep working unchanged. `runAsRoot: true`
+  // runs as root (what the opt-out always achieved), and `runAsRoot: false`
+  // keeps the non-root default it explicitly affirmed. The new key wins if
+  // both are set.
+  const nonRoot =
+    c.runAsNonRoot === true ||
+    (c.runAsNonRoot === undefined && c.runAsRoot === false)
+  if (nonRoot) {
     container.securityContext.runAsNonRoot = true
   }
 

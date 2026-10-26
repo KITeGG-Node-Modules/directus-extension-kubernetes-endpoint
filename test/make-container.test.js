@@ -47,7 +47,8 @@ describe('makeContainer', () => {
 
   it('hardens the security context by default', () => {
     const container = makeContainer({ name: 'app', image: 'app' }, [])
-    expect(container.securityContext.runAsNonRoot).toBe(true)
+    // non-root is opt-in: images with a root default user must keep working
+    expect(container.securityContext.runAsNonRoot).toBeUndefined()
     expect(container.securityContext.allowPrivilegeEscalation).toBe(false)
     expect(container.securityContext.seccompProfile.type).toBe('RuntimeDefault')
     expect(container.securityContext.capabilities.drop).toEqual(['ALL'])
@@ -56,21 +57,44 @@ describe('makeContainer', () => {
     ])
   })
 
-  it('allows opting out of non-root and seccomp per container', () => {
+  it('opts into non-root and out of seccomp per container', () => {
     const root = makeContainer(
-      { name: 'app', image: 'app', runAsRoot: true, seccomp: false },
+      { name: 'app', image: 'app', seccomp: false },
       []
     )
     expect(root.securityContext.runAsNonRoot).toBeUndefined()
     expect(root.securityContext.seccompProfile).toBeUndefined()
 
-    // non-root and an explicit user are compatible
+    // non-root opt-in and an explicit user are compatible
     const user = makeContainer(
-      { name: 'app', image: 'app', user: 1000 },
+      { name: 'app', image: 'app', runAsNonRoot: true, user: 1000 },
       []
     )
     expect(user.securityContext.runAsNonRoot).toBe(true)
     expect(user.securityContext.runAsUser).toBe(1000)
+  })
+
+  it('keeps the legacy runAsRoot key working', () => {
+    // old opt-out: still runs as root
+    const root = makeContainer(
+      { name: 'app', image: 'app', runAsRoot: true },
+      []
+    )
+    expect(root.securityContext.runAsNonRoot).toBeUndefined()
+
+    // old explicit affirmation of the non-root default: still non-root
+    const nonRoot = makeContainer(
+      { name: 'app', image: 'app', runAsRoot: false },
+      []
+    )
+    expect(nonRoot.securityContext.runAsNonRoot).toBe(true)
+
+    // the new key wins when both are set
+    const both = makeContainer(
+      { name: 'app', image: 'app', runAsNonRoot: false, runAsRoot: false },
+      []
+    )
+    expect(both.securityContext.runAsNonRoot).toBeUndefined()
   })
 
   it('adds requested capabilities on top of the drop of ALL', () => {

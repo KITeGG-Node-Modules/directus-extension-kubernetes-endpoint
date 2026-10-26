@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { imageRegistry, validateContainer } from '../src/lib/validate-container.js'
+import {
+  imageRegistry,
+  validateContainer,
+} from '../src/lib/validate-container.js'
 
 describe('validateContainer', () => {
   it('accepts a minimal container', () => {
@@ -90,12 +93,22 @@ describe('validateContainer', () => {
 
   it('accepts images from the default registries and bare names', () => {
     const base = { name: 'app' }
-    expect(validateContainer({ ...base, image: 'pytorch/pytorch:latest' })).toEqual([]) // docker.io
+    expect(
+      validateContainer({ ...base, image: 'pytorch/pytorch:latest' })
+    ).toEqual([]) // docker.io
     expect(validateContainer({ ...base, image: 'nginx' })).toEqual([]) // docker.io
-    expect(validateContainer({ ...base, image: 'nvcr.io/nvidia/cuda:12' })).toEqual([])
-    expect(validateContainer({ ...base, image: 'registry.kitegg.de/models/vllm' })).toEqual([])
-    expect(validateContainer({ ...base, image: 'registry.motionbank.org/app:1' })).toEqual([])
-    expect(validateContainer({ ...base, image: 'ghcr.io/owner/repo' })).toEqual([])
+    expect(
+      validateContainer({ ...base, image: 'nvcr.io/nvidia/cuda:12' })
+    ).toEqual([])
+    expect(
+      validateContainer({ ...base, image: 'registry.kitegg.de/models/vllm' })
+    ).toEqual([])
+    expect(
+      validateContainer({ ...base, image: 'registry.motionbank.org/app:1' })
+    ).toEqual([])
+    expect(validateContainer({ ...base, image: 'ghcr.io/owner/repo' })).toEqual(
+      []
+    )
   })
 
   it('rejects images from unknown registries, listing the allowlist', () => {
@@ -121,12 +134,21 @@ describe('validateContainer', () => {
     ).toBeGreaterThan(0)
   })
 
-  it('rejects non-boolean hardening opt-outs', () => {
+  it('rejects non-boolean hardening flags', () => {
     const base = { name: 'app', image: 'app' }
+    expect(validateContainer({ ...base, runAsNonRoot: true })).toEqual([])
     expect(validateContainer({ ...base, runAsRoot: true })).toEqual([])
+    expect(validateContainer({ ...base, runAsRoot: false })).toEqual([])
     expect(validateContainer({ ...base, seccomp: false })).toEqual([])
-    expect(validateContainer({ ...base, runAsRoot: 'yes' }).length).toBeGreaterThan(0)
-    expect(validateContainer({ ...base, seccomp: 'no' }).length).toBeGreaterThan(0)
+    expect(
+      validateContainer({ ...base, runAsNonRoot: 'yes' }).length
+    ).toBeGreaterThan(0)
+    expect(
+      validateContainer({ ...base, runAsRoot: 'yes' }).length
+    ).toBeGreaterThan(0)
+    expect(
+      validateContainer({ ...base, seccomp: 'no' }).length
+    ).toBeGreaterThan(0)
   })
 })
 

@@ -277,7 +277,15 @@ hardening rollout:
 | No service account token mounted (`automountServiceAccountToken: false`)       | none — user pods never reach the Kubernetes API (blocked by egress policies), the token would only be theft bait                                                                                                                                                                                                                          |
 | Seccomp profile `RuntimeDefault`                                               | `seccomp: false` (e.g. for `strace`/`perf`)                                                                                                                                                                                                                                                                                               |
 | Linux capabilities: `drop: ['ALL']`, `add: ['NET_BIND_SERVICE', ...requested]` | `capabilities: [...]` may request further capabilities from `ALLOWED_CAPABILITIES` (`src/lib/constants.js` — the Docker/containerd default set: `CHOWN`, `SETUID`, `NET_RAW`, …). `NET_BIND_SERVICE` is granted implicitly so images serving on port 80/443 keep working; `SYS_ADMIN`, `NET_ADMIN`, `SYS_PTRACE` etc. are never available |
-| `runAsNonRoot: true`                                                           | `runAsRoot: true`                                                                                                                                                                                                                                                                                                                         |
+
+Containers run with the image's default user — usually root, since most
+images need it to start. Images that support a non-root user can enforce
+it per container with `runAsNonRoot: true` (the pod is then rejected at
+admission if the image's default user is root); an explicit `user`/
+`group` in the YAML overrides the image default regardless. Deployments
+written for the previous non-root-by-default behavior keep working:
+`runAsRoot: true` still runs as root and `runAsRoot: false` still keeps
+the non-root default.
 
 Images must come from an allowed registry
 (`DEFAULT_IMAGE_REGISTRIES` in `src/lib/constants.js`: docker.io,
@@ -295,10 +303,12 @@ deploy time with the allowed list in the error message.
   start full and shrink as users redeploy):
 
   ```sh
-  # deployments running as root (runAsRoot opt-out)
+  # containers opting into non-root (runAsNonRoot: true)
   kubectl get sts -n services -o json | jq -r '
-    .items[] | select(.spec.template.spec.securityContext.runAsNonRoot != true)
-    | .metadata.name'
+    .items[] | .metadata.name as $sts |
+    .spec.template.spec.containers[]?
+    | select(.securityContext.runAsNonRoot == true)
+    | "\($sts)/\(.name)"'
   # containers with capabilities beyond the default grant
   kubectl get sts -n services -o json | jq -r '
     .items[] | .metadata.name as $sts |
@@ -377,8 +387,9 @@ containers:
     fsGroup: 1000
     changeGroupOnMismatch: true # Optional
 
-    # Container hardening (all on by default)
-    runAsRoot: false # true: allow the image to run as root (opt-out of runAsNonRoot)
+    # Container hardening (seccomp and capabilities are on by default)
+    runAsNonRoot: false # true: require the image's default user to be non-root (off by default; most images run as root)
+    runAsRoot: false # legacy key, still honored: true runs as root, false keeps the non-root default
     seccomp: true # false: disable the default seccomp profile (e.g. for strace/perf)
     capabilities: ['CHOWN'] # extra capabilities beyond the drop of ALL;
     # NET_BIND_SERVICE is always granted so images serving on port 80/443 keep working
