@@ -2,6 +2,16 @@ import { DEFAULT_IMAGE_REGISTRIES } from './constants.js'
 
 export const servicesNamespace = process.env.SERVICES_NAMESPACE || 'services'
 
+// JupyterHub user notebooks run here. Their GPU profiles are unlocked by
+// gpu_reservations (jupyterhub-profiles-endpoint) and enforced by the
+// reservations-watcher, so their consumption belongs in the capacity
+// display alongside the services namespace.
+export const jupyterhubNamespace =
+  process.env.JUPYTERHUB_NAMESPACE || 'jupyterhub'
+
+// Namespaces whose GPU consumption the capacity endpoint reports.
+export const countedNamespaces = [servicesNamespace, jupyterhubNamespace]
+
 // M2M field on the `deployments` collection listing users with rights on
 // a deployment (junction rows expose the user as `directus_users_id`).
 // Set it to an empty value to skip this ownership source.
