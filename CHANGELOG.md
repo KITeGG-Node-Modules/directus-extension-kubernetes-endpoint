@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- The capacity endpoint now reports GPU claims only for reservation-governed namespaces, so the utilisation display can no longer show claims exceeding reservations. It counts the `services` namespace (user services) plus the JupyterHub namespace (user notebooks, whose GPU profiles are unlocked by `gpu_reservations` and enforced by the reservations-watcher) — previously it summed GPU resource requests across all namespaces, letting system pods and JupyterHub notebooks inflate the claimed figure. Both namespaces are configurable via `SERVICES_NAMESPACE` and the new `JUPYTERHUB_NAMESPACE` (default `jupyterhub`)
 - User workloads can reach the Traefik ingress entry point again: kube-proxy DNATs connections to the public ingress IP (`134.93.175.63`, also a control-plane address) into the Traefik pod _before_ Calico evaluates the egress policy, so the destination seen by the policy is the Traefik pod IP on its pod ports (8000/8443) — cluster-internal and therefore dropped by the pod-CIDR exception. The per-deployment and hardening egress policies now allow egress to the `traefik-v2` namespace on those ports explicitly; the public-IP rule (TCP 80/443) stays for `.62` (the other cluster's ingress, no local DNAT) and keeps every other port — notably the Kubernetes API on 6443 — blocked
 
 ### Changed
