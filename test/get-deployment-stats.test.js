@@ -73,7 +73,15 @@ function mockKubeletSummaries(byNode) {
 
 const POD = {
   metadata: { name: 'sd-5-0', labels: { app: 'sd-5' } },
-  spec: { nodeName: 'worker-1', containers: [{ name: 'nginx' }] },
+  spec: {
+    nodeName: 'worker-1',
+    containers: [
+      {
+        name: 'nginx',
+        resources: { limits: { 'nvidia.com/gpu': 1 } },
+      },
+    ],
+  },
   status: { phase: 'Running' },
 }
 
@@ -229,10 +237,18 @@ describe('getDeploymentStats', () => {
       {
         gpu: '0',
         uuid: 'GPU-abc',
+        gpuInstanceId: null,
+        migProfile: null,
         modelName: 'NVIDIA A100',
         utilizationPercent: 87,
         memoryBytes: 4096 * 1024 ** 2,
+        // the FB_FREE query returned nothing in this fixture
+        capacityBytes: null,
       },
+    ])
+    // the pod's own grant, from its spec's GPU resource limits
+    expect(stats.pods[0].gpuAllocation).toEqual([
+      { resource: 'nvidia.com/gpu', count: 1 },
     ])
     // the DCGM queries are scoped to the deployment's pods (backslash
     // doubled for the PromQL string literal, see lib/prometheus.js)
@@ -289,6 +305,60 @@ describe('getDeploymentStats', () => {
     expect(rateQuery).toContain(
       'sum by (pod) (rate(container_network_receive_bytes_total{pod=~"^sd-5-\\\\d+$"}[300s]))'
     )
+  })
+
+  it('reports MIG slice profile, capacity and the GPU allocation', async () => {
+    const pod = structuredClone(POD)
+    pod.spec.containers[0].resources.limits = {
+      'nvidia.com/mig-1g.10gb': 1,
+    }
+    mockPods([pod])
+    mockMetrics([METRIC])
+    mockKubeletSummaries({ 'worker-1': SUMMARY })
+    fetchMock.mockImplementation(async (url) => {
+      const query = new URL(url).searchParams.get('query')
+      const device = {
+        pod: 'sd-5-0',
+        gpu: '0',
+        UUID: 'GPU-abc',
+        GPU_I_ID: '3',
+        GPU_I_PROFILE: '1g.10gb',
+      }
+      const result = query.includes('DCGM_FI_DEV_GPU_UTIL')
+        ? [{ metric: device, value: [1794180000, '87'] }]
+        : query.includes('DCGM_FI_DEV_FB_USED')
+          ? [{ metric: device, value: [1794180000, '2048'] }]
+          : query.includes('DCGM_FI_DEV_FB_FREE')
+            ? [{ metric: device, value: [1794180000, '8192'] }]
+            : []
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          status: 'success',
+          data: { resultType: 'vector', result },
+        }),
+      }
+    })
+
+    const stats = await getDeploymentStats({ id: '5' })
+    expect(stats.pods[0].gpus).toEqual([
+      {
+        gpu: '0',
+        uuid: 'GPU-abc',
+        gpuInstanceId: '3',
+        migProfile: '1g.10gb',
+        modelName: null,
+        utilizationPercent: 87,
+        // slice capacity = FB_USED + FB_FREE (10 GiB for a 1g.10gb),
+        // not the whole GPU's memory
+        memoryBytes: 2048 * 1024 ** 2,
+        capacityBytes: 1024 ** 3 * 10,
+      },
+    ])
+    expect(stats.pods[0].gpuAllocation).toEqual([
+      { resource: 'nvidia.com/mig-1g.10gb', count: 1 },
+    ])
   })
 
   it('degrades network usage silently when Prometheus is unreachable', async () => {

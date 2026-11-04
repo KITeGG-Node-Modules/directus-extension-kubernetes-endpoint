@@ -6,6 +6,7 @@ import {
   collectNetworkSeries,
   networkRateQueries,
 } from './lib/network-metrics.js'
+import { getContainerLimits } from './lib/container-limits.js'
 
 // Durations ("30s", "5m", "1h", "7d") — the single-unit subset of the
 // Prometheus duration syntax, enough for range/step parameters
@@ -129,6 +130,14 @@ export async function getDeploymentStatsHistory(
   const start = end - rangeSeconds
   const rateWindow = Math.max(step, MIN_RATE_WINDOW_SECONDS)
 
+  // The containers' deployed ceilings (cpu/memory/... limits), so
+  // clients can show usage against the granted capacity. A missing
+  // StatefulSet means there is nothing to ceiling (empty map) — the
+  // Prometheus queries already return empty series in that case.
+  const limitsByContainer = await getContainerLimits(statefulSetName, {
+    allowNotFound: true,
+  })
+
   // StatefulSet pods are named <statefulSetName>-<ordinal>; a requested
   // pod name pins the queries to that pod, otherwise the whole set
   const podSelector = statefulSetPodSelector(statefulSetName, podName)
@@ -209,7 +218,8 @@ export async function getDeploymentStatsHistory(
   const gpuDevices = collectGpuDevices(
     results.gpuUtilization,
     results.gpuProfileUtilization,
-    results.gpuMemory
+    results.gpuMemory,
+    results.gpuMemoryFree
   )
   const networkSeries = collectNetworkSeries(
     results.networkReceiveRate,
@@ -238,6 +248,9 @@ export async function getDeploymentStatsHistory(
         pod,
         cpuCores: cpu.get(key) ?? [],
         memoryBytes: memory.get(key) ?? [],
+        // the deployed ceiling for this container (identical across
+        // replicas — they share the StatefulSet pod template)
+        limits: limitsByContainer.get(name) ?? null,
       }
     }),
     volumes: claimNames.map((name) => ({
@@ -249,9 +262,12 @@ export async function getDeploymentStatsHistory(
       pod: device.pod,
       gpu: device.gpu,
       uuid: device.uuid,
+      gpuInstanceId: device.gpuInstanceId,
+      migProfile: device.migProfile,
       modelName: device.modelName,
       utilizationPercent: device.utilization,
       memoryBytes: device.memoryBytes,
+      capacityBytes: device.capacityBytes,
     })),
     networks: networkSeries.map((entry) => ({
       pod: entry.pod,

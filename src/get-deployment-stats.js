@@ -14,6 +14,8 @@ import {
   collectNetworkSeries,
   networkCurrentQueries,
 } from './lib/network-metrics.js'
+import { GPU_RESOURCE_NAMES } from './lib/gpu-profiles.js'
+import { getContainerLimits } from './lib/container-limits.js'
 
 const METRICS_API_GROUP = 'metrics.k8s.io'
 const METRICS_API_VERSION = 'v1beta1'
@@ -192,20 +194,29 @@ async function getGpuUsage(podSelector) {
   }
   const queries = gpuDeviceQueries(podSelector)
   try {
-    const [utilization, profileUtilization, memory] = await Promise.all([
-      prometheusQuery(prometheusUrl, '/api/v1/query', {
-        query: queries.utilization,
-      }),
-      prometheusQuery(prometheusUrl, '/api/v1/query', {
-        query: queries.profileUtilization,
-      }),
-      prometheusQuery(prometheusUrl, '/api/v1/query', {
-        query: queries.memory,
-      }),
-    ])
+    const [utilization, profileUtilization, memory, memoryFree] =
+      await Promise.all([
+        prometheusQuery(prometheusUrl, '/api/v1/query', {
+          query: queries.utilization,
+        }),
+        prometheusQuery(prometheusUrl, '/api/v1/query', {
+          query: queries.profileUtilization,
+        }),
+        prometheusQuery(prometheusUrl, '/api/v1/query', {
+          query: queries.memory,
+        }),
+        prometheusQuery(prometheusUrl, '/api/v1/query', {
+          query: queries.memoryFree,
+        }),
+      ])
     return {
       available: true,
-      devices: collectGpuDevices(utilization, profileUtilization, memory),
+      devices: collectGpuDevices(
+        utilization,
+        profileUtilization,
+        memory,
+        memoryFree
+      ),
     }
   } catch {
     return { available: false, devices: [] }
@@ -251,6 +262,34 @@ async function getNetworkUsage(podSelector) {
 }
 
 /**
+ * The GPU resources a pod was allocated, from the live pod spec's
+ * container limits (requests equal limits for extended resources):
+ * [{ resource: 'nvidia.com/mig-1g.10gb', count: 1 }, ...]. This is the
+ * deployment's own grant — visible even when DCGM has no data, and the
+ * counterpart the per-device migProfile/capacityBytes are measured
+ * against.
+ */
+function gpuAllocation(pod) {
+  const counts = new Map()
+  for (const container of pod.spec?.containers ?? []) {
+    for (const [resource, value] of Object.entries(
+      container.resources?.limits ?? {}
+    )) {
+      if (GPU_RESOURCE_NAMES.includes(resource)) {
+        const count = Number(value)
+        if (Number.isFinite(count) && count > 0) {
+          counts.set(resource, (counts.get(resource) ?? 0) + count)
+        }
+      }
+    }
+  }
+  return [...counts.entries()].map(([resource, count]) => ({
+    resource,
+    count,
+  }))
+}
+
+/**
  * Merge the rate and total series for one pod into the response's
  * `network` block (nulls when Prometheus had no data for the pod).
  */
@@ -281,7 +320,6 @@ function networkForPod(networkUsage, podName) {
  */
 export async function getDeploymentStats(deployment, podName = null) {
   const statefulSetName = getDeploymentName(deployment.id)
-  const appsClient = getKubernetesClient(servicesNamespace, k8s.AppsV1Api)
   const coreClient = getKubernetesClient(servicesNamespace)
 
   const fieldSelector = podName ? `metadata.name=${podName}` : undefined
@@ -301,15 +339,7 @@ export async function getDeploymentStats(deployment, podName = null) {
 
   // Limits come from the StatefulSet pod template — the containers as
   // deployed (the deployment YAML's cpu/memory values after normalization)
-  const { body: statefulSet } = await appsClient.readNamespacedStatefulSet(
-    statefulSetName,
-    servicesNamespace
-  )
-  const limitsByContainer = new Map(
-    (statefulSet.spec?.template?.spec?.containers ?? [])
-      .filter((container) => container.resources?.limits)
-      .map((container) => [container.name, container.resources.limits])
-  )
+  const limitsByContainer = await getContainerLimits(statefulSetName)
 
   const [
     { metrics, available: metricsAvailable },
@@ -361,10 +391,14 @@ export async function getDeploymentStats(deployment, podName = null) {
           .map((device) => ({
             gpu: device.gpu,
             uuid: device.uuid,
+            gpuInstanceId: device.gpuInstanceId,
+            migProfile: device.migProfile,
             modelName: device.modelName,
             utilizationPercent: latestSample(device.utilization),
             memoryBytes: latestSample(device.memoryBytes),
+            capacityBytes: latestSample(device.capacityBytes),
           })),
+        gpuAllocation: gpuAllocation(pod),
         network: networkForPod(networkUsage, pod.metadata.name),
       }
     }),

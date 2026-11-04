@@ -15,6 +15,13 @@ vi.mock('../src/lib/config.js', () => ({
   },
 }))
 
+vi.mock('../src/lib/container-limits.js', () => ({
+  // The deployed ceilings come from the Kubernetes API — keep unit tests
+  // off the network with a fixed grant for the 'nginx' container
+  getContainerLimits: async () =>
+    new Map([['nginx', { cpu: '4', memory: '32Gi' }]]),
+}))
+
 import {
   getDeploymentStatsHistory,
   parseDuration,
@@ -104,9 +111,9 @@ describe('getDeploymentStatsHistory', () => {
     expect(end - start).toBe(3600)
 
     // One request per query: cpu, memory, volume used/capacity,
-    // GPU utilization (whole-GPU + MIG profile fallback) + framebuffer,
-    // network receive/transmit rates
-    expect(fetchMock.mock.calls).toHaveLength(9)
+    // GPU utilization (whole-GPU + MIG profile fallback) + framebuffer
+    // used/free, network receive/transmit rates
+    expect(fetchMock.mock.calls).toHaveLength(10)
     const queries = fetchMock.mock.calls.map((call) =>
       new URL(call[0]).searchParams.get('query')
     )
@@ -117,9 +124,9 @@ describe('getDeploymentStatsHistory', () => {
     expect(queries[2]).toContain('kubelet_volume_stats_used_bytes')
     expect(queries[2]).toContain('persistentvolumeclaim=~"^.*-sd-5-\\\\d+$"')
     expect(queries[4]).toContain(
-      'max by (gpu, UUID, modelName, pod) (DCGM_FI_DEV_GPU_UTIL{pod=~"^sd-5-\\\\d+$"})'
+      'max by (gpu, UUID, modelName, pod, GPU_I_PROFILE, GPU_I_ID) (DCGM_FI_DEV_GPU_UTIL{pod=~"^sd-5-\\\\d+$"})'
     )
-    expect(queries[5]).toContain('DCGM_FI_PROF_GR_ENGINE_ACTIVE')
+    expect(queries[7]).toContain('DCGM_FI_DEV_FB_FREE')
     expect(queries[6]).toContain('DCGM_FI_DEV_FB_USED')
 
     expect(history.containers).toEqual([
@@ -134,6 +141,7 @@ describe('getDeploymentStatsHistory', () => {
           [1794180000, 0.012],
           [1794180300, 0.014],
         ],
+        limits: { cpu: '4', memory: '32Gi' },
       },
     ])
   })
@@ -175,12 +183,14 @@ describe('getDeploymentStatsHistory', () => {
         pod: 'sd-5-0',
         cpuCores: [],
         memoryBytes: [[1794180000, 100]],
+        limits: { cpu: '4', memory: '32Gi' },
       },
       {
         name: 'nginx',
         pod: 'sd-5-1',
         cpuCores: [],
         memoryBytes: [[1794180000, 200]],
+        limits: { cpu: '4', memory: '32Gi' },
       },
     ])
   })
@@ -260,6 +270,16 @@ describe('getDeploymentStatsHistory', () => {
             values: [[1794180000, '4096']],
           },
         ]
+      } else if (query.includes('DCGM_FI_DEV_FB_FREE')) {
+        result = [
+          {
+            metric: { pod: 'sd-5-0', gpu: '0', UUID: 'GPU-abc' },
+            values: [
+              [1794180000, '12288'],
+              [1794180300, '12288'],
+            ],
+          },
+        ]
       }
       return {
         ok: true,
@@ -282,12 +302,16 @@ describe('getDeploymentStatsHistory', () => {
         pod: 'sd-5-0',
         gpu: '0',
         uuid: 'GPU-abc',
+        gpuInstanceId: null,
+        migProfile: null,
         modelName: 'NVIDIA A100',
         utilizationPercent: [
           [1794180000, 85],
           [1794180300, 91],
         ],
         memoryBytes: [[1794180000, 4096 * 1024 ** 2]],
+        // capacity = FB_USED + FB_FREE per timestamp
+        capacityBytes: [[1794180000, 16384 * 1024 ** 2]],
       },
     ])
   })
@@ -378,10 +402,10 @@ describe('getDeploymentStatsHistory', () => {
     const queries = fetchMock.mock.calls.map((call) =>
       new URL(call[0]).searchParams.get('query')
     )
-    expect(queries[7]).toContain(
+    expect(queries[8]).toContain(
       'sum by (pod) (rate(container_network_receive_bytes_total{pod=~"^sd-5-\\\\d+$"}[240s]))'
     )
-    expect(queries[8]).toContain('container_network_transmit_bytes_total')
+    expect(queries[9]).toContain('container_network_transmit_bytes_total')
   })
 
   it('rejects invalid ranges and steps with a 400-shaped error', async () => {
@@ -411,7 +435,7 @@ describe('getDeploymentStatsHistory', () => {
     )
     expect(history.available).toBe(false)
     expect(history.reason).toBe('prometheus_unavailable')
-    expect(history.warnings).toHaveLength(9)
+    expect(history.warnings).toHaveLength(10)
   })
 
   it('degrades when the Prometheus API reports an error', async () => {

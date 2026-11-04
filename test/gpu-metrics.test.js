@@ -10,12 +10,13 @@ describe('gpuDeviceQueries', () => {
   it('builds DCGM queries scoped to the pod selector', () => {
     const queries = gpuDeviceQueries('^sd-5-\\d+$')
     expect(queries.utilization).toBe(
-      'max by (gpu, UUID, modelName, pod) (DCGM_FI_DEV_GPU_UTIL{pod=~"^sd-5-\\\\d+$"})'
+      'max by (gpu, UUID, modelName, pod, GPU_I_PROFILE, GPU_I_ID) (DCGM_FI_DEV_GPU_UTIL{pod=~"^sd-5-\\\\d+$"})'
     )
     expect(queries.profileUtilization).toContain(
       'DCGM_FI_PROF_GR_ENGINE_ACTIVE'
     )
     expect(queries.memory).toContain('DCGM_FI_DEV_FB_USED')
+    expect(queries.memoryFree).toContain('DCGM_FI_DEV_FB_FREE')
   })
 
   it('escapes the selector for the PromQL string literal (regression: \\d as escape sequence)', () => {
@@ -59,14 +60,61 @@ describe('collectGpuDevices', () => {
         pod: 'sd-5-0',
         gpu: '0',
         uuid: 'GPU-abc',
+        gpuInstanceId: null,
+        migProfile: null,
         modelName: 'A100',
         utilization: [
           [100, 85],
           [200, 91],
         ],
         memoryBytes: [[100, 4096 * 1024 ** 2]],
+        // no FB_FREE data — capacity is unknown, not guessed
+        capacityBytes: [],
       },
     ])
+  })
+
+  it('computes per-sample capacity from FB_USED + FB_FREE and keeps the MIG slice labels', () => {
+    const devices = collectGpuDevices(
+      [],
+      [],
+      [
+        {
+          metric: {
+            pod: 'sd-5-0',
+            gpu: '0',
+            UUID: 'GPU-abc',
+            GPU_I_ID: '3',
+            GPU_I_PROFILE: '1g.10gb',
+          },
+          values: [
+            [100, '2048'],
+            [200, '4096'],
+          ],
+        },
+      ],
+      [
+        {
+          metric: {
+            pod: 'sd-5-0',
+            gpu: '0',
+            UUID: 'GPU-abc',
+            GPU_I_ID: '3',
+            GPU_I_PROFILE: '1g.10gb',
+          },
+          values: [[100, '8192']],
+        },
+      ]
+    )
+    expect(devices[0].migProfile).toBe('1g.10gb')
+    expect(devices[0].gpuInstanceId).toBe('3')
+    expect(devices[0].memoryBytes).toEqual([
+      [100, 2048 * 1024 ** 2],
+      [200, 4096 * 1024 ** 2],
+    ])
+    // capacity only where used and free share a timestamp
+    // (2048 MiB used + 8192 MiB free = 10 GiB slice)
+    expect(devices[0].capacityBytes).toEqual([[100, 10240 * 1024 ** 2]])
   })
 
   it('accepts instant-query (vector) form and scales the MIG fallback ×100', () => {
@@ -85,9 +133,12 @@ describe('collectGpuDevices', () => {
         pod: 'sd-5-0',
         gpu: '1',
         uuid: 'GPU-mig',
+        gpuInstanceId: null,
+        migProfile: null,
         modelName: null,
         utilization: [[100, 87]],
         memoryBytes: [],
+        capacityBytes: [],
       },
     ])
   })
@@ -109,6 +160,7 @@ describe('collectGpuDevices', () => {
         { metric: { pod: 'sd-5-0', gpu: '3' }, value: [100, '2'] },
         { metric: { pod: 'sd-5-0', gpu: '2' }, value: [100, '3'] },
       ],
+      [],
       [],
       []
     )

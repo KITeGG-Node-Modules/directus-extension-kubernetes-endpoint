@@ -732,10 +732,16 @@ An example output:
         {
           "gpu": "0",
           "uuid": "GPU-abc",
+          "gpuInstanceId": "3",
+          "migProfile": "1g.10gb",
           "modelName": "NVIDIA A100",
           "utilizationPercent": 87,
-          "memoryBytes": 4294967296
+          "memoryBytes": 4294967296,
+          "capacityBytes": 10737418240
         }
+      ],
+      "gpuAllocation": [
+        { "resource": "nvidia.com/mig-1g.10gb", "count": 1 }
       ],
       "network": {
         "receiveBytesPerSecond": 12800,
@@ -766,6 +772,12 @@ Notes:
   not exposed. `gpuMetricsAvailable` is `false` when the Prometheus
   queries fail or dcgm-exporter is not deployed, or when the exporter
   lacks pod mapping; GPU-less deployments simply have an empty `gpus`.
+- On MIG slices, `migProfile`/`gpuInstanceId` identify the allocated
+  slice and `capacityBytes` is the slice's actual framebuffer size
+  (`DCGM_FI_DEV_FB_USED + DCGM_FI_DEV_FB_FREE`) — so `memoryBytes` can
+  be shown against the slice (e.g. 10 GiB for `1g.10gb`) instead of the
+  whole GPU. `gpuAllocation` is the pod's own grant (the GPU resource
+  limits of its containers), visible even without DCGM data.
 - `network` carries the pod's inbound/outbound traffic from cAdvisor
   metrics (instant Prometheus queries): transfer rates in bytes/s
   (`receiveBytesPerSecond`/`transmitBytesPerSecond`, rate over a 5m
@@ -821,7 +833,8 @@ An example output:
       "memoryBytes": [
         [1794180000, 270600704],
         [1794180300, 271261696]
-      ]
+      ],
+      "limits": { "cpu": "4", "memory": "32Gi" }
     }
   ],
   "volumes": [
@@ -843,6 +856,8 @@ An example output:
       "pod": "sd-1234-0",
       "gpu": "0",
       "uuid": "GPU-abc",
+      "gpuInstanceId": "3",
+      "migProfile": "1g.10gb",
       "modelName": "NVIDIA A100",
       "utilizationPercent": [
         [1794180000, 85],
@@ -851,6 +866,10 @@ An example output:
       "memoryBytes": [
         [1794180000, 4294967296],
         [1794180300, 4294967296]
+      ],
+      "capacityBytes": [
+        [1794180000, 10737418240],
+        [1794180300, 10737418240]
       ]
     }
   ],
@@ -890,6 +909,15 @@ Notes:
   `container_network_transmit_bytes_total`, summed per pod), so a
   series also ends when its pod is removed.
   `networkMetricsAvailable` is `false` when the queries return no data.
+- Each container series carries `limits` — the CPU/memory (and GPU)
+  ceilings the container was deployed with, from the StatefulSet pod
+  template — so usage can be displayed against the granted capacity.
+- GPU device series carry the MIG context: `migProfile` (e.g.
+  `1g.10gb`) and `gpuInstanceId` identify the slice (null on whole
+  GPUs), and `capacityBytes` is the device's actual framebuffer size
+  (`DCGM_FI_DEV_FB_USED + DCGM_FI_DEV_FB_FREE`) — for a MIG device that
+  is the slice's size, so `memoryBytes` can be shown against the
+  allocated slice rather than the whole GPU.
 - Container series are aggregated per container name AND replica pod
   (`sum by (container, pod)`): a multi-container pod shows one series
   per container, a multi-replica deployment one series per replica, so
