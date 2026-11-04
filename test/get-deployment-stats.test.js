@@ -234,10 +234,11 @@ describe('getDeploymentStats', () => {
         memoryBytes: 4096 * 1024 ** 2,
       },
     ])
-    // the DCGM queries are scoped to the deployment's pods
+    // the DCGM queries are scoped to the deployment's pods (backslash
+    // doubled for the PromQL string literal, see lib/prometheus.js)
     const gpuQuery = new URL(calls[0]).searchParams.get('query')
     expect(gpuQuery).toContain('DCGM_FI_DEV_GPU_UTIL')
-    expect(gpuQuery).toContain('pod=~"^sd-5-\\d+$"')
+    expect(gpuQuery).toContain('pod=~"^sd-5-\\\\d+$"')
   })
 
   it('falls back to the MIG profile metric when GPU_UTIL is absent', async () => {

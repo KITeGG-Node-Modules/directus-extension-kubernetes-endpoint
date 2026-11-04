@@ -110,13 +110,13 @@ describe('getDeploymentStatsHistory', () => {
       new URL(call[0]).searchParams.get('query')
     )
     expect(queries[0]).toContain(
-      'sum by (container) (rate(container_cpu_usage_seconds_total{namespace="services",pod=~"^sd-5-\\d+$",container!="",container!="POD"}[240s]))'
+      'sum by (container) (rate(container_cpu_usage_seconds_total{namespace="services",pod=~"^sd-5-\\\\d+$",container!="",container!="POD"}[240s]))'
     )
     expect(queries[1]).toContain('container_memory_working_set_bytes')
     expect(queries[2]).toContain('kubelet_volume_stats_used_bytes')
-    expect(queries[2]).toContain('persistentvolumeclaim=~"^.*-sd-5-\\d+$"')
+    expect(queries[2]).toContain('persistentvolumeclaim=~"^.*-sd-5-\\\\d+$"')
     expect(queries[4]).toContain(
-      'max by (gpu, UUID, modelName, pod) (DCGM_FI_DEV_GPU_UTIL{pod=~"^sd-5-\\d+$"})'
+      'max by (gpu, UUID, modelName, pod) (DCGM_FI_DEV_GPU_UTIL{pod=~"^sd-5-\\\\d+$"})'
     )
     expect(queries[5]).toContain('DCGM_FI_PROF_GR_ENGINE_ACTIVE')
     expect(queries[6]).toContain('DCGM_FI_DEV_FB_USED')

@@ -1,6 +1,6 @@
 import { getDeploymentName, statefulSetPodSelector } from './lib/util.js'
 import { prometheusUrl, servicesNamespace } from './lib/config.js'
-import { prometheusQuery } from './lib/prometheus.js'
+import { prometheusQuery, promqlString } from './lib/prometheus.js'
 import { collectGpuDevices, gpuDeviceQueries } from './lib/gpu-metrics.js'
 
 // Durations ("30s", "5m", "1h", "7d") — the single-unit subset of the
@@ -121,7 +121,10 @@ export async function getDeploymentStatsHistory(
   // <template-name>-<statefulSetName>-<ordinal> (see isVolumeClaimOf)
   const claimSelector = `^.*-${escapeRegex(statefulSetName)}-\\d+$`
 
-  const podLabels = `namespace="${servicesNamespace}",pod=~"${podSelector}"`
+  // The regex selectors go into PromQL string literals, where a single
+  // backslash (\d) is an unknown escape sequence — promqlString doubles
+  // them (see lib/prometheus.js)
+  const podLabels = `namespace="${servicesNamespace}",pod=~${promqlString(podSelector)}`
   // container="POD" rows are the pause containers cAdvisor reports per
   // pod — not a user container's usage
   const containerSelector = `${podLabels},container!="",container!="POD"`
@@ -129,8 +132,8 @@ export async function getDeploymentStatsHistory(
   const queries = {
     cpu: `sum by (container) (rate(container_cpu_usage_seconds_total{${containerSelector}}[${rateWindow}s]))`,
     memory: `sum by (container) (container_memory_working_set_bytes{${containerSelector}})`,
-    volumeUsed: `max by (persistentvolumeclaim) (kubelet_volume_stats_used_bytes{namespace="${servicesNamespace}",persistentvolumeclaim=~"${claimSelector}"})`,
-    volumeCapacity: `max by (persistentvolumeclaim) (kubelet_volume_stats_capacity_bytes{namespace="${servicesNamespace}",persistentvolumeclaim=~"${claimSelector}"})`,
+    volumeUsed: `max by (persistentvolumeclaim) (kubelet_volume_stats_used_bytes{namespace="${servicesNamespace}",persistentvolumeclaim=~${promqlString(claimSelector)}})`,
+    volumeCapacity: `max by (persistentvolumeclaim) (kubelet_volume_stats_capacity_bytes{namespace="${servicesNamespace}",persistentvolumeclaim=~${promqlString(claimSelector)}})`,
     // GPU utilization is invisible to the metrics-server/cAdvisor —
     // DCGM is the only source (see lib/gpu-metrics.js)
     ...Object.fromEntries(

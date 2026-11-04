@@ -10,12 +10,22 @@ describe('gpuDeviceQueries', () => {
   it('builds DCGM queries scoped to the pod selector', () => {
     const queries = gpuDeviceQueries('^sd-5-\\d+$')
     expect(queries.utilization).toBe(
-      'max by (gpu, UUID, modelName, pod) (DCGM_FI_DEV_GPU_UTIL{pod=~"^sd-5-\\d+$"})'
+      'max by (gpu, UUID, modelName, pod) (DCGM_FI_DEV_GPU_UTIL{pod=~"^sd-5-\\\\d+$"})'
     )
     expect(queries.profileUtilization).toContain(
       'DCGM_FI_PROF_GR_ENGINE_ACTIVE'
     )
     expect(queries.memory).toContain('DCGM_FI_DEV_FB_USED')
+  })
+
+  it('escapes the selector for the PromQL string literal (regression: \\d as escape sequence)', () => {
+    // PromQL parses string literals before the regex engine, so the
+    // literal must contain a doubled backslash; a verbatim \d fails the
+    // whole query with HTTP 400 "unknown escape sequence U+0064 'd'"
+    const queries = gpuDeviceQueries('^sd-5-\\d+$')
+    for (const query of Object.values(queries)) {
+      expect(query).toContain('pod=~"^sd-5-\\\\d+$"')
+    }
   })
 })
 

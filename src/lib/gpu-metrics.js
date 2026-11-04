@@ -3,6 +3,8 @@
 // operator and scraped by Prometheus). GPU utilization is invisible to
 // the metrics-server and cAdvisor — DCGM is the only source.
 
+import { promqlString } from './prometheus.js'
+
 // Whole-GPU utilization in percent (0-100)
 export const GPU_UTIL_METRIC = 'DCGM_FI_DEV_GPU_UTIL'
 // MIG-partitioned GPUs frequently do not expose DCGM_FI_DEV_GPU_UTIL;
@@ -21,7 +23,10 @@ const MIB = 1024 ** 2
  * the exporter runs without pod mapping).
  */
 export function gpuDeviceQueries(podSelector) {
-  const labels = `pod=~"${podSelector}"`
+  // promqlString: the selector is a PromQL string literal — a verbatim
+  // `\d` from the pod regex is an unknown escape sequence there (see
+  // lib/prometheus.js)
+  const labels = `pod=~${promqlString(podSelector)}`
   const aggregation = 'max by (gpu, UUID, modelName, pod)'
   return {
     utilization: `${aggregation} (${GPU_UTIL_METRIC}{${labels}})`,
