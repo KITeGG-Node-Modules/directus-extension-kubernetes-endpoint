@@ -41,9 +41,17 @@ function invalidParameter(message) {
  * Prometheus sample values parsed to numbers.
  */
 function seriesByLabel(result, label) {
+  return seriesByLabels(result, [label])
+}
+
+/**
+ * Like seriesByLabel, but keyed by the joined values of several labels —
+ * used for the per-(container, pod) container series.
+ */
+function seriesByLabels(result, labels) {
   const series = new Map()
   for (const entry of result) {
-    const key = entry.metric?.[label] ?? ''
+    const key = labels.map((label) => entry.metric?.[label] ?? '').join('|')
     series.set(
       key,
       (entry.values ?? []).map(([timestamp, value]) => [
@@ -60,17 +68,21 @@ function seriesByLabel(result, label) {
  * usage, queried from the Prometheus instance that scrapes the services
  * namespace (the same metrics the stats endpoint samples point-in-time):
  *
- * - CPU cores per container: rate of container_cpu_usage_seconds_total
- *   (exactly what kubectl top / the metrics-server derive their samples
- *   from)
- * - memory working set per container: container_memory_working_set_bytes
- *   (the metric the OOM killer and the metrics-server are based on)
+ * - CPU cores per container and pod: rate of
+ *   container_cpu_usage_seconds_total (exactly what kubectl top / the
+ *   metrics-server derive their samples from)
+ * - memory working set per container and pod:
+ *   container_memory_working_set_bytes (the metric the OOM killer and
+ *   the metrics-server are based on)
  * - volume usage per claim: kubelet_volume_stats_used_bytes /
  *   kubelet_volume_stats_capacity_bytes
  *
- * Series are aggregated by container name across the deployment's
- * replicas (sum), so a series survives pod restarts and re-scheduling;
- * single-pod deployments can scope queries with ?pod=<pod name>.
+ * Container series are aggregated per container name AND replica pod —
+ * a multi-container pod shows one series per container, a multi-replica
+ * deployment one series per replica, so the charts always show where
+ * the usage comes from. The trade-off: a series ends when its pod is
+ * re-scheduled (the new pod starts a fresh one). Single-pod
+ * deployments can further scope queries with ?pod=<pod name>.
  *
  * Like the stats endpoint, history degrades instead of failing: without
  * a configured Prometheus (`PROMETHEUS_URL=''`) or on query errors the
@@ -130,8 +142,10 @@ export async function getDeploymentStatsHistory(
   const containerSelector = `${podLabels},container!="",container!="POD"`
 
   const queries = {
-    cpu: `sum by (container) (rate(container_cpu_usage_seconds_total{${containerSelector}}[${rateWindow}s]))`,
-    memory: `sum by (container) (container_memory_working_set_bytes{${containerSelector}})`,
+    // Per container AND pod: replicas stay separate lines instead of
+    // merging into one sum
+    cpu: `sum by (container, pod) (rate(container_cpu_usage_seconds_total{${containerSelector}}[${rateWindow}s]))`,
+    memory: `sum by (container, pod) (container_memory_working_set_bytes{${containerSelector}})`,
     volumeUsed: `max by (persistentvolumeclaim) (kubelet_volume_stats_used_bytes{namespace="${servicesNamespace}",persistentvolumeclaim=~${promqlString(claimSelector)}})`,
     volumeCapacity: `max by (persistentvolumeclaim) (kubelet_volume_stats_capacity_bytes{namespace="${servicesNamespace}",persistentvolumeclaim=~${promqlString(claimSelector)}})`,
     // GPU utilization is invisible to the metrics-server/cAdvisor —
@@ -166,9 +180,9 @@ export async function getDeploymentStatsHistory(
     }
   }
 
-  const cpu = seriesByLabel(results.cpu, 'container')
-  const memory = seriesByLabel(results.memory, 'container')
-  const containerNames = [...new Set([...cpu.keys(), ...memory.keys()])].sort()
+  const cpu = seriesByLabels(results.cpu, ['container', 'pod'])
+  const memory = seriesByLabels(results.memory, ['container', 'pod'])
+  const containerKeys = [...new Set([...cpu.keys(), ...memory.keys()])].sort()
   const volumeUsed = seriesByLabel(results.volumeUsed, 'persistentvolumeclaim')
   const volumeCapacity = seriesByLabel(
     results.volumeCapacity,
@@ -193,11 +207,18 @@ export async function getDeploymentStatsHistory(
     gpuMetricsAvailable:
       results.gpuUtilization.length > 0 ||
       results.gpuProfileUtilization.length > 0,
-    containers: containerNames.map((name) => ({
-      name,
-      cpuCores: cpu.get(name) ?? [],
-      memoryBytes: memory.get(name) ?? [],
-    })),
+    containers: containerKeys.map((key) => {
+      // container and pod names are DNS labels — '|' never occurs in a key
+      const separator = key.indexOf('|')
+      const name = key.slice(0, separator)
+      const pod = key.slice(separator + 1)
+      return {
+        name,
+        pod,
+        cpuCores: cpu.get(key) ?? [],
+        memoryBytes: memory.get(key) ?? [],
+      }
+    }),
     volumes: claimNames.map((name) => ({
       name,
       usedBytes: volumeUsed.get(name) ?? [],

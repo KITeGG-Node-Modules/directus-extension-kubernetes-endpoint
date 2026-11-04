@@ -110,7 +110,7 @@ describe('getDeploymentStatsHistory', () => {
       new URL(call[0]).searchParams.get('query')
     )
     expect(queries[0]).toContain(
-      'sum by (container) (rate(container_cpu_usage_seconds_total{namespace="services",pod=~"^sd-5-\\\\d+$",container!="",container!="POD"}[240s]))'
+      'sum by (container, pod) (rate(container_cpu_usage_seconds_total{namespace="services",pod=~"^sd-5-\\\\d+$",container!="",container!="POD"}[240s]))'
     )
     expect(queries[1]).toContain('container_memory_working_set_bytes')
     expect(queries[2]).toContain('kubelet_volume_stats_used_bytes')
@@ -124,6 +124,7 @@ describe('getDeploymentStatsHistory', () => {
     expect(history.containers).toEqual([
       {
         name: 'nginx',
+        pod: '',
         cpuCores: [
           [1794180000, 0.012],
           [1794180300, 0.014],
@@ -132,6 +133,53 @@ describe('getDeploymentStatsHistory', () => {
           [1794180000, 0.012],
           [1794180300, 0.014],
         ],
+      },
+    ])
+  })
+
+  it('keeps replica pods as separate container series', async () => {
+    // sum by (container, pod): two replicas show up as two entries per
+    // container instead of merging into one summed line. Entries without
+    // a pod label (defensive) keep an empty pod string.
+    fetchMock.mockImplementation(async (url) => {
+      const query = new URL(url).searchParams.get('query')
+      const isMemory = query.includes('container_memory_working_set_bytes')
+      const result = isMemory
+        ? [
+            matrixResult('container', 'nginx', [[1794180000, 100]]),
+            matrixResult('container', 'nginx', [[1794180000, 200]]),
+          ].map((entry, index) => ({
+            ...entry,
+            metric: { ...entry.metric, pod: index === 0 ? 'sd-5-0' : 'sd-5-1' },
+          }))
+        : []
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          status: 'success',
+          data: { resultType: 'matrix', result },
+        }),
+      }
+    })
+
+    const history = await getDeploymentStatsHistory(
+      { id: '5' },
+      { rangeSeconds: 3600 }
+    )
+    expect(history.available).toBe(true)
+    expect(history.containers).toEqual([
+      {
+        name: 'nginx',
+        pod: 'sd-5-0',
+        cpuCores: [],
+        memoryBytes: [[1794180000, 100]],
+      },
+      {
+        name: 'nginx',
+        pod: 'sd-5-1',
+        cpuCores: [],
+        memoryBytes: [[1794180000, 200]],
       },
     ])
   })

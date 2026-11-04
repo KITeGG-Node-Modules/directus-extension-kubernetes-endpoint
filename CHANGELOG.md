@@ -29,6 +29,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Cluster-side monitoring ingress manifest `k8s/prometheus-allow.yaml`: makes every pod in the `services` namespace reachable and discoverable from the `prometheus` namespace (all ports, namespace-wide ingress allowance) so Prometheus can scrape the entire namespace instead of the single LiteLLM target. Purely additive to the per-deployment and hardening policies; the header documents the discovery/reachability split (kubernetes_sd RBAC and CoreDNS live in the prometheus namespace) and the system-services implication
 - `k8s/litellm-allow.yaml` split accordingly: renamed to `k8s/litellm-llp-allow.yaml` (LLP → LiteLLM on TCP 4000 only, unchanged in-cluster policy name `litellm-ingress-allow`); its prometheus entry is now covered namespace-wide by `k8s/prometheus-allow.yaml`. Apply the prometheus manifest before re-applying the trimmed LLP manifest to avoid a scrape gap
 
+### Changed
+
+- The stats history endpoint now breaks container series down per replica pod (`sum by (container, pod)`) instead of summing across the deployment's replicas — a multi-replica deployment shows one line per replica instead of a single merged sum, and each series entry carries the owning `pod` (empty when the metric had no pod label). A series now ends when its pod is removed; the replacement pod starts a fresh one. The optional `?pod=` parameter is unchanged
+
 ### Fixed
 
 - The stats endpoints' Prometheus queries are valid PromQL again: the pod-name and volume-claim regex selectors (`^<set>-\\d+$`) were embedded verbatim into PromQL string literals, where PromQL parses string escapes before the regex engine — every query failed with HTTP 400 `unknown escape sequence U+0064 'd'` and the usage history always degraded to `prometheus_unavailable` (and the stats endpoint's GPU section to empty). Selectors are now rendered as proper PromQL string literals (`promqlString`, escaping backslashes and quotes), and Prometheus error bodies are included in the degradation `warnings` so future rejections are diagnosable

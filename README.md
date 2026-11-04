@@ -858,9 +858,13 @@ Notes:
   not deployed (or exposes no data for the deployment) — `gpus` is then
   empty while CPU/memory/volume series continue. GPU series are grouped
   by device, not aggregated, and carry the owning pod.
-- Series are aggregated by container name across the deployment's
-  replicas (sum), so they survive pod restarts and rescheduling; a
-  stale series ends where the pod was removed.
+- Container series are aggregated per container name AND replica pod
+  (`sum by (container, pod)`): a multi-container pod shows one series
+  per container, a multi-replica deployment one series per replica, so
+  the charts always show where the usage comes from. A series ends when
+  its pod is removed; the replacement pod starts a fresh one. The
+  optional `?pod=` parameter pins the queries to a single pod as
+  before.
 - The endpoint needs no extra Kubernetes RBAC — the extension talks to
   Prometheus' HTTP API directly. It targets
   `http://prometheus-operated.<PROMETHEUS_NAMESPACE>.svc:9090`
