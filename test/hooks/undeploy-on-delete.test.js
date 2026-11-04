@@ -24,15 +24,25 @@ const context = {
 }
 
 function register() {
-  const api = { action: vi.fn(), schedule: vi.fn(), filter: vi.fn(), init: vi.fn() }
+  const api = {
+    action: vi.fn(),
+    schedule: vi.fn(),
+    filter: vi.fn(),
+    init: vi.fn(),
+  }
   registerHook(api, context)
   return api
 }
 
 function filterHandler() {
   const api = register()
-  const handler = api.filter.mock.calls.find(([e]) => e === 'deployments.items.delete')?.[1]
-  expect(handler, 'no filter handler registered for deployments.items.delete').toBeDefined()
+  const handler = api.filter.mock.calls.find(
+    ([e]) => e === 'deployments.items.delete'
+  )?.[1]
+  expect(
+    handler,
+    'no filter handler registered for deployments.items.delete'
+  ).toBeDefined()
   return handler
 }
 

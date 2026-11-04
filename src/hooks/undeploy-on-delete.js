@@ -14,43 +14,43 @@ import { isNotFound } from '../lib/is-not-found.js'
  * makes the whole operation re-runnable.
  */
 export default function registerHook({ filter }, context) {
-	const { services, getSchema } = context
+  const { services, getSchema } = context
 
-	filter('deployments.items.delete', async (keys) => {
-		if (!Array.isArray(keys) || !keys.length) return keys
+  filter('deployments.items.delete', async (keys) => {
+    if (!Array.isArray(keys) || !keys.length) return keys
 
-		const schema = await getSchema()
-		const deploymentsService = new services.ItemsService('deployments', {
-			schema,
-			// the K8s cleanup does not depend on the requester's visibility —
-			// read the items as admin so the deletion cannot be obscured
-			accountability: null
-		})
+    const schema = await getSchema()
+    const deploymentsService = new services.ItemsService('deployments', {
+      schema,
+      // the K8s cleanup does not depend on the requester's visibility —
+      // read the items as admin so the deletion cannot be obscured
+      accountability: null,
+    })
 
-		const deployments = await deploymentsService.readMany(keys, {
-			fields: ['id']
-		})
+    const deployments = await deploymentsService.readMany(keys, {
+      fields: ['id'],
+    })
 
-		const errors = []
-		for (const deployment of deployments) {
-			try {
-				await deleteDeployment(deployment)
-			} catch (err) {
-				// a deployment that was never deployed leaves no resources —
-				// nothing to clean up, not an error
-				if (!isNotFound(err)) {
-					errors.push({ deployment: deployment.id, error: err })
-				}
-			}
-		}
+    const errors = []
+    for (const deployment of deployments) {
+      try {
+        await deleteDeployment(deployment)
+      } catch (err) {
+        // a deployment that was never deployed leaves no resources —
+        // nothing to clean up, not an error
+        if (!isNotFound(err)) {
+          errors.push({ deployment: deployment.id, error: err })
+        }
+      }
+    }
 
-		if (errors.length) {
-			const first = errors[0]
-			throw new Error(
-				`Failed to undeploy deployment ${first.deployment}: ${first.error.message}`
-			)
-		}
+    if (errors.length) {
+      const first = errors[0]
+      throw new Error(
+        `Failed to undeploy deployment ${first.deployment}: ${first.error.message}`
+      )
+    }
 
-		return keys
-	})
+    return keys
+  })
 }

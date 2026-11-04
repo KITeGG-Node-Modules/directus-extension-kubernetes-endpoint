@@ -53,7 +53,12 @@ function portsOfDeployment(deployment) {
  * @param {Array} targets subset of items to sync (defaults to all)
  * @returns {{policies: number, headlessServices: number}}
  */
-export async function syncNetworkPolicies(services, schema, deployments, targets) {
+export async function syncNetworkPolicies(
+  services,
+  schema,
+  deployments,
+  targets
+) {
   const items = targets ?? deployments ?? []
   let policies = 0
   let headlessServices = 0
@@ -66,10 +71,7 @@ export async function syncNetworkPolicies(services, schema, deployments, targets
       statefulSetName
     )
     policies += 1
-    await createService(
-      makeHeadlessService(statefulSetName),
-      statefulSetName
-    )
+    await createService(makeHeadlessService(statefulSetName), statefulSetName)
     headlessServices += 1
   }
   return { policies, headlessServices }

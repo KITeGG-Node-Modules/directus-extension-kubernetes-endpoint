@@ -36,9 +36,12 @@ describe('isVolumeClaimOf', () => {
   it('matches template claim names of the stateful set', () => {
     expect(isVolumeClaimOf('data-sd-5-0', 'sd-5')).toBe(true)
     expect(isVolumeClaimOf('scratch-sd-5-15', 'sd-5')).toBe(true)
-    expect(isVolumeClaimOf('data-sd-123e4567-e89b-12d3-a456-426614174000-0', 'sd-123e4567-e89b-12d3-a456-426614174000')).toBe(
-      true
-    )
+    expect(
+      isVolumeClaimOf(
+        'data-sd-123e4567-e89b-12d3-a456-426614174000-0',
+        'sd-123e4567-e89b-12d3-a456-426614174000'
+      )
+    ).toBe(true)
   })
 
   it('rejects claims of other deployments and non-claim names', () => {

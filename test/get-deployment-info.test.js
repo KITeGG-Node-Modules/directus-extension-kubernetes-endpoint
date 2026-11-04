@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { readNamespacedStatefulSet, listNamespacedPod, listNamespacedPersistentVolumeClaim } =
-  vi.hoisted(() => ({
-    readNamespacedStatefulSet: vi.fn(),
-    listNamespacedPod: vi.fn(),
-    listNamespacedPersistentVolumeClaim: vi.fn(),
-  }))
+const {
+  readNamespacedStatefulSet,
+  listNamespacedPod,
+  listNamespacedPersistentVolumeClaim,
+} = vi.hoisted(() => ({
+  readNamespacedStatefulSet: vi.fn(),
+  listNamespacedPod: vi.fn(),
+  listNamespacedPersistentVolumeClaim: vi.fn(),
+}))
 
 vi.mock('../src/lib/get-kubernetes-client.js', () => ({
   getKubernetesClient: () => ({
@@ -61,7 +64,10 @@ describe('getDeploymentInfo', () => {
                   started: false,
                   restartCount: 0,
                   state: {
-                    waiting: { reason: 'ImagePullBackOff', message: 'Back-off pulling image' },
+                    waiting: {
+                      reason: 'ImagePullBackOff',
+                      message: 'Back-off pulling image',
+                    },
                   },
                 },
               ],

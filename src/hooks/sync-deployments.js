@@ -1,4 +1,7 @@
-import { backfillNetworkPolicies, syncDeploymentIds } from '../sync-network-policies.js'
+import {
+  backfillNetworkPolicies,
+  syncDeploymentIds,
+} from '../sync-network-policies.js'
 
 // Coalesce bursts of item edits (e.g. saving a deployment fires one action
 // per mutation) into a single sync
@@ -48,7 +51,10 @@ export default function registerHook({ action, schedule }, context) {
         await syncDeploymentIds(services, schema, ids)
       }
     } catch (err) {
-      console.error('Failed to sync network policies after deployment edit:', err)
+      console.error(
+        'Failed to sync network policies after deployment edit:',
+        err
+      )
     } finally {
       syncing = false
       // Edits that arrived while syncing are still pending

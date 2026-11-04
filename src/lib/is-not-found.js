@@ -3,5 +3,5 @@
 // case means the resource is already gone and every cleanup step treats
 // it as success
 export function isNotFound(err) {
-	return err?.statusCode === 404 || err?.body?.code === 404
+  return err?.statusCode === 404 || err?.body?.code === 404
 }

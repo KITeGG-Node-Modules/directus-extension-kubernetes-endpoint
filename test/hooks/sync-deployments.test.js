@@ -59,7 +59,11 @@ describe('sync-deployments hook', () => {
     actionHandler(api, 'deployments.items.update')({ keys: [7] })
     await vi.advanceTimersByTimeAsync(2000)
     expect(syncDeploymentIds).toHaveBeenCalledTimes(1)
-    expect(syncDeploymentIds).toHaveBeenCalledWith(context.services, { some: 'schema' }, ['5', '7'])
+    expect(syncDeploymentIds).toHaveBeenCalledWith(
+      context.services,
+      { some: 'schema' },
+      ['5', '7']
+    )
     expect(backfillNetworkPolicies).not.toHaveBeenCalled()
   })
 
@@ -67,7 +71,11 @@ describe('sync-deployments hook', () => {
     const api = register()
     actionHandler(api, 'deployments.items.create')({ key: 'abc' })
     await vi.advanceTimersByTimeAsync(2000)
-    expect(syncDeploymentIds).toHaveBeenCalledWith(context.services, { some: 'schema' }, ['abc'])
+    expect(syncDeploymentIds).toHaveBeenCalledWith(
+      context.services,
+      { some: 'schema' },
+      ['abc']
+    )
   })
 
   it('runs the scheduled reconciliation as a full sync', async () => {

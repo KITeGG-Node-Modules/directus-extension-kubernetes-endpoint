@@ -41,7 +41,10 @@ describe('labelExistingVolumeClaims', () => {
     })
     await labelExistingVolumeClaims('sd-5')
     const calls = coreClient.patchNamespacedPersistentVolumeClaim.mock.calls
-    expect(calls.map((call) => call[0])).toEqual(['data-sd-5-0', 'scratch-sd-5-1'])
+    expect(calls.map((call) => call[0])).toEqual([
+      'data-sd-5-0',
+      'scratch-sd-5-1',
+    ])
     for (const call of calls) {
       expect(call[1]).toBe(servicesNamespace)
       expect(call[2]).toEqual({ metadata: { labels: { app: 'sd-5' } } })

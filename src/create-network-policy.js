@@ -9,10 +9,7 @@ import { upsert } from './lib/upsert.js'
  * update replaces it as-is — NetworkPolicy specs are mutable.
  */
 export async function createNetworkPolicy(networkPolicy, statefulSetName) {
-  const client = getKubernetesClient(
-    servicesNamespace,
-    k8s.NetworkingV1Api
-  )
+  const client = getKubernetesClient(servicesNamespace, k8s.NetworkingV1Api)
   return upsert({
     read: () =>
       client.readNamespacedNetworkPolicy(statefulSetName, servicesNamespace),

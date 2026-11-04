@@ -14,7 +14,6 @@ function ingressSources(rule) {
 }
 
 describe('makeNetworkPolicy', () => {
-
   it('allows itself, the ingress path and other user workloads', () => {
     const policy = makeNetworkPolicy('sd-5', { ports })
     expect(policy.metadata).toMatchObject({
@@ -77,8 +76,13 @@ describe('makeNetworkPolicy', () => {
 
   it('builds egress for DNS, user pods, the ingress path and the internet', () => {
     const policy = makeNetworkPolicy('sd-5', { ports })
-    const [dnsRule, userPodsRule, publicIngressRule, traefikRule, internetRule] =
-      policy.spec.egress
+    const [
+      dnsRule,
+      userPodsRule,
+      publicIngressRule,
+      traefikRule,
+      internetRule,
+    ] = policy.spec.egress
 
     expect(dnsRule.to[0]).toMatchObject({
       namespaceSelector: {
@@ -95,9 +99,10 @@ describe('makeNetworkPolicy', () => {
 
     // The Traefik entry point on the public control-plane addresses: web
     // ports only, so the Kubernetes API (6443) stays unreachable
-    expect(
-      publicIngressRule.to.map((peer) => peer.ipBlock.cidr)
-    ).toEqual(['134.93.175.62/32', '134.93.175.63/32'])
+    expect(publicIngressRule.to.map((peer) => peer.ipBlock.cidr)).toEqual([
+      '134.93.175.62/32',
+      '134.93.175.63/32',
+    ])
     expect(
       publicIngressRule.ports.map((port) => [port.protocol, port.port])
     ).toEqual([
@@ -111,15 +116,19 @@ describe('makeNetworkPolicy', () => {
     expect(traefikRule.to[0].namespaceSelector.matchLabels).toEqual({
       'kubernetes.io/metadata.name': 'traefik-v2',
     })
-    expect(
-      traefikRule.ports.map((port) => [port.protocol, port.port])
-    ).toEqual([
-      ['TCP', 8000],
-      ['TCP', 8443],
-    ])
+    expect(traefikRule.ports.map((port) => [port.protocol, port.port])).toEqual(
+      [
+        ['TCP', 8000],
+        ['TCP', 8443],
+      ]
+    )
 
     expect(internetRule.to[0].ipBlock.cidr).toBe('0.0.0.0/0')
-    for (const internal of ['192.168.0.0/16', '10.96.0.0/12', '169.254.169.254/32']) {
+    for (const internal of [
+      '192.168.0.0/16',
+      '10.96.0.0/12',
+      '169.254.169.254/32',
+    ]) {
       // 169.254.169.254 is covered by the link-local except
       if (internal === '169.254.169.254/32') {
         expect(internetRule.to[0].ipBlock.except).toContain('169.254.0.0/16')
@@ -146,7 +155,10 @@ describe('declaredPorts', () => {
       declaredPorts([
         {
           name: 'app',
-          ports: [{ name: 'http', port: 80 }, { name: 'admin', port: 9000 }],
+          ports: [
+            { name: 'http', port: 80 },
+            { name: 'admin', port: 9000 },
+          ],
         },
         { name: 'sidecar', ports: [{ name: 'http', port: 80 }] },
       ])
@@ -172,7 +184,9 @@ describe('makeHeadlessService', () => {
   })
 
   it('keeps regular services ClusterIP-backed with their ports', () => {
-    const service = makeService('sd-5', 'sd-5-app', [{ name: 'http', port: 80 }])
+    const service = makeService('sd-5', 'sd-5-app', [
+      { name: 'http', port: 80 },
+    ])
     expect(service.spec.clusterIP).toBeUndefined()
     expect(service.spec.ports).toEqual([
       expect.objectContaining({ name: 'http', port: 80 }),
