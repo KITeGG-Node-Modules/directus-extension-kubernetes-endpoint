@@ -95,6 +95,29 @@ export function validateDeployment(deployment, userGroups = []) {
     }
   }
 
+  // Port names must be unique across all ports of the pod (containers
+  // and init containers share the namespace); duplicates are rejected by
+  // the API server with an opaque error
+  const portNameOwners = new Map()
+  const portNameChecks = [
+    ['containers', deployment.containers],
+    ['initContainers', deployment.initContainers || []],
+  ]
+  for (const [attribute, containers] of portNameChecks) {
+    for (const container of containers) {
+      for (const port of container.ports || []) {
+        if (typeof port?.name !== 'string') continue
+        if (portNameOwners.has(port.name)) {
+          validationErrors.push({
+            [attribute]: [`duplicate port name '${port.name}'`],
+          })
+        } else {
+          portNameOwners.set(port.name, attribute)
+        }
+      }
+    }
+  }
+
   if (deployment.volumes) {
     if (!Array.isArray(deployment.volumes)) {
       validationErrors.push({ volumes: ['must be an array'] })
@@ -105,10 +128,30 @@ export function validateDeployment(deployment, userGroups = []) {
           name: {
             presence: true,
             type: 'string',
+            // DNS-1123 label limit: volume names become volume claim
+            // template names and volume references
+            length: {
+              maximum: 63,
+              message: 'of volume must be at most 63 characters',
+            },
             format: {
               pattern: RFC1123_PATTERN,
               message:
                 'of volume must be a lowercase RFC1123 hostname (a-z,0-9,-,.)',
+            },
+          },
+          // access mode of the generated volume claim (make-volume-claim)
+          type: {
+            type: 'string',
+            inclusion: {
+              within: [
+                'ReadWriteOnce',
+                'ReadOnlyMany',
+                'ReadWriteMany',
+                'ReadWriteOncePod',
+              ],
+              message:
+                'must be a valid access mode (ReadWriteOnce, ReadOnlyMany, ReadWriteMany, ReadWriteOncePod)',
             },
           },
           // size and emptyDir.sizeLimit are validated below: they may be
@@ -168,7 +211,14 @@ export function validateDeployment(deployment, userGroups = []) {
             volumes: [`'${volume.name}' needs a size or an emptyDir.sizeLimit`],
           })
         }
-        volumeNames.add(volume.name)
+        // Kubernetes rejects duplicate volume names within a pod
+        if (volumeNames.has(volume.name)) {
+          validationErrors.push({
+            volumes: [`duplicate volume name '${volume.name}'`],
+          })
+        } else {
+          volumeNames.add(volume.name)
+        }
       }
 
       // Mounts referencing undeclared volumes fail scheduling with an

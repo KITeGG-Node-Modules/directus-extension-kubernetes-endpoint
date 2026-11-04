@@ -4,13 +4,11 @@ import { deleteUnreadyStatefulSetPods } from '../delete-unready-stateful-set-pod
 import { checkReservation } from '../lib/check-reservation.js'
 import { makeService } from '../lib/make-service.js'
 import { makeStatefulSet } from '../lib/make-stateful-set.js'
-import {
-  isDeploymentOwner,
-  loadDeployment,
-} from '../lib/resolve-deployment.js'
+import { isDeploymentOwner, loadDeployment } from '../lib/resolve-deployment.js'
 import {
   getDeploymentName,
   handleErrorResponse,
+  isDns1123Label,
   parseDeploymentData,
 } from '../lib/util.js'
 import { validateDeployment } from '../lib/validate-deployment.js'
@@ -27,6 +25,13 @@ export async function deployDeployment(ctx) {
     return { message: 'api_errors.forbidden' }
   }
   const statefulSetName = getDeploymentName(deployment.id)
+  // slugify can strip an id down to nothing (or stray dashes), producing
+  // a name the API server would reject — fail with a clean 400 before
+  // creating anything
+  if (!isDns1123Label(statefulSetName)) {
+    res.status(400)
+    return { message: 'api_errors.bad_request' }
+  }
   let deploymentData
   try {
     deploymentData = parseDeploymentData(deployment)

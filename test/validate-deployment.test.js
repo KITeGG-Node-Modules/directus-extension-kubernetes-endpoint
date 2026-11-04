@@ -106,4 +106,63 @@ describe('validateDeployment', () => {
       { containers: ["volume mount 'nope' has no matching volume"] },
     ])
   })
+
+  it('rejects duplicate port names across the pod', () => {
+    const errors = validateDeployment({
+      containers: [
+        { name: 'a', image: 'a', ports: [{ name: 'http', port: 80 }] },
+        { name: 'b', image: 'b', ports: [{ name: 'http', port: 8080 }] },
+      ],
+    })
+    expect(errors).toEqual([{ containers: ["duplicate port name 'http'"] }])
+  })
+
+  it('rejects duplicate port names within one container', () => {
+    const errors = validateDeployment({
+      containers: [
+        {
+          name: 'a',
+          image: 'a',
+          ports: [
+            { name: 'http', port: 80 },
+            { name: 'http', port: 8080 },
+          ],
+        },
+      ],
+    })
+    expect(errors).toEqual([{ containers: ["duplicate port name 'http'"] }])
+  })
+
+  it('rejects duplicate volume names', () => {
+    const errors = validateDeployment({
+      ...validDeployment,
+      volumes: [
+        { name: 'data', size: '1Gi' },
+        { name: 'data', size: '2Gi' },
+      ],
+    })
+    expect(errors).toEqual([{ volumes: ["duplicate volume name 'data'"] }])
+  })
+
+  it('caps volume name lengths at 63 characters', () => {
+    const errors = validateDeployment({
+      ...validDeployment,
+      volumes: [{ name: 'a'.repeat(64), size: '1Gi' }],
+    })
+    expect(errors.length).toBeGreaterThan(0)
+  })
+
+  it('validates volume access modes', () => {
+    expect(
+      validateDeployment({
+        ...validDeployment,
+        volumes: [{ name: 'data', size: '1Gi', type: 'ReadWriteMany' }],
+      })
+    ).toBeUndefined()
+    const errors = validateDeployment({
+      ...validDeployment,
+      volumes: [{ name: 'data', size: '1Gi', type: 'ReadWriteOnceMany' }],
+    })
+    expect(errors.length).toBeGreaterThan(0)
+  })
 })

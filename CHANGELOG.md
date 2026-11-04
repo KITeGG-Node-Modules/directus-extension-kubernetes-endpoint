@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Stricter validation of the deployment YAML against the Kubernetes conventions of the fields its values are mapped to, so malformed payloads now fail with a clean 400 instead of opaque API-server admission errors (or partial deployments where the StatefulSet is created but its derived per-container Services fail):
+  - port names must be IANA service names — lowercase RFC 1035 labels starting with a letter and at most 15 characters — port numbers are capped at 65535, and port names must be unique across all containers and init containers of the pod
+  - environment variable names must match `[-._a-zA-Z][-._a-zA-Z0-9]*` (no leading digit), and the `fromSecret`/`fromConfig` key references must match the secret/config map key charset (`[-._a-zA-Z0-9]+`, the same rule put-secret/put-config already enforce on the uploaded keys) and must not both be set on one variable — `make-container` previously let `fromSecret` silently win
+  - `user`, `group`, `fsUser` and `fsGroup` must be non-negative (Kubernetes rejects negative runAsUser/runAsGroup/fsGroup), and `gpuCount` must be positive (0 silently became the default of 1)
+  - `command` and `args` must be lists of strings — other element types serialized as JSON numbers/objects and were rejected only by the API server
+  - duplicate `mountPath`s within a container and duplicate volume names within a pod are rejected
+  - container, volume-mount and volume names are capped at the 63-character DNS-1123 label limit (longer container names also overflow the derived service name `sd-<id>-<container>`); volume `type` — the access mode of the generated volume claim — is now validated against the four canonical access modes (it was previously passed to the claim unchecked)
+  - image references are sanity-checked (lowercase path components, optional `host:port` registry, tag and/or digest, no whitespace) before the registry allowlist is applied
+- The deploy endpoint rejects deployments whose generated resource name (`sd-` + slugified id) is not a valid DNS-1123 label with a 400 before creating anything — slugify can strip an id down to nothing or stray dashes, producing a name like `sd-` that only failed at the Kubernetes API
+
 ## [2.1.0] - 2026-10-27
 
 ### Added

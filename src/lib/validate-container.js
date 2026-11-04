@@ -6,6 +6,32 @@ import { formatQuantity, parseQuantity } from './quantity.js'
 
 const GIB = 1024 ** 3
 
+// Kubernetes identifier conventions for the fields mapped below.
+// validate.js' format rule enforces a full-string match, so no anchors.
+
+// Port names are IANA service names: RFC 1035 labels of at most 15
+// characters, starting with a letter (length is capped by the
+// `length` rule on the port name)
+const PORT_NAME_PATTERN = '[a-z]([-a-z0-9]*[a-z0-9])?'
+
+// Environment variable names must not start with a digit and may only
+// contain letters, digits, '_', '-' and '.'
+const ENV_VAR_NAME_PATTERN = '[-._a-zA-Z][-._a-zA-Z0-9]*'
+
+// Secret/ConfigMap keys — same restriction put-secret/put-config apply
+// to the uploaded keys themselves
+const DATA_KEY_PATTERN = '[-._a-zA-Z0-9]+'
+
+// Sanity subset of the Docker image reference grammar: lowercase path
+// components, optional registry host[:port], tag and/or digest, no
+// whitespace. The API server validates the reference authoritatively —
+// this only catches obviously malformed values client-side.
+const IMAGE_REFERENCE_PATTERN =
+  '[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?::[0-9]+)?' +
+  '(?:/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*' +
+  '(?::[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127})?' +
+  '(?:@[a-zA-Z0-9]+(?:[.+_-][a-zA-Z0-9]+)*:[a-fA-F0-9]+)?'
+
 /**
  * The registry of a Docker image reference, lowercased. A leading path
  * component counts as a registry host only when the reference has at
@@ -117,6 +143,12 @@ export function validateContainer(
     name: {
       presence: true,
       type: 'string',
+      // DNS-1123 label limit; longer names also break the derived
+      // per-container service name (<statefulSet>-<container>)
+      length: {
+        maximum: 63,
+        message: 'of container must be at most 63 characters',
+      },
       format: {
         pattern:
           '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*',
@@ -127,6 +159,11 @@ export function validateContainer(
     image: {
       presence: true,
       type: 'string',
+      format: {
+        pattern: IMAGE_REFERENCE_PATTERN,
+        message:
+          'must be a valid image reference (lowercase path, optional tag/digest)',
+      },
     },
     ports: {
       type: 'array',
@@ -144,18 +181,21 @@ export function validateContainer(
         strict: true,
         noStrings: true,
         onlyInteger: true,
+        greaterThan: 0,
         lessThanOrEqualTo: isManagement ? 8 : 2,
       },
     },
     // cpu/memory are validated below: they may be numbers (in NUMBER_UNITS
     // units) or Kubernetes quantity strings, which validate.js' single-type
     // rules cannot express
+    // Kubernetes rejects negative runAsUser/runAsGroup/fsGroup values
     user: {
       type: 'integer',
       numericality: {
         strict: true,
         noStrings: true,
         onlyInteger: true,
+        greaterThanOrEqualTo: 0,
       },
     },
     group: {
@@ -164,6 +204,7 @@ export function validateContainer(
         strict: true,
         noStrings: true,
         onlyInteger: true,
+        greaterThanOrEqualTo: 0,
       },
     },
     fsUser: {
@@ -172,6 +213,7 @@ export function validateContainer(
         strict: true,
         noStrings: true,
         onlyInteger: true,
+        greaterThanOrEqualTo: 0,
       },
     },
     fsGroup: {
@@ -180,6 +222,7 @@ export function validateContainer(
         strict: true,
         noStrings: true,
         onlyInteger: true,
+        greaterThanOrEqualTo: 0,
       },
     },
     command: {
@@ -211,12 +254,33 @@ export function validateContainer(
   validateCapabilities(container, validationErrors)
   if (validationErrors.length) return validationErrors
 
+  // command/args must be lists of strings: the client serializes other
+  // element types as JSON numbers/objects, which the API server rejects
+  for (const attribute of ['command', 'args']) {
+    if (
+      Array.isArray(container[attribute]) &&
+      container[attribute].some((element) => typeof element !== 'string')
+    ) {
+      validationErrors.push({ [attribute]: ['must be a list of strings'] })
+    }
+  }
+
   if (Array.isArray(container.ports)) {
     for (const port of container.ports) {
       const portErrors = validate(port, {
         name: {
           presence: true,
           type: 'string',
+          length: {
+            maximum: 15,
+            message:
+              'of port must be at most 15 characters (IANA service name)',
+          },
+          format: {
+            pattern: PORT_NAME_PATTERN,
+            message:
+              'of port must be a lowercase IANA service name (a-z,0-9,-, starting with a letter)',
+          },
         },
         port: {
           presence: true,
@@ -226,6 +290,7 @@ export function validateContainer(
             noStrings: true,
             onlyInteger: true,
             greaterThan: 0,
+            lessThanOrEqualTo: 65535,
           },
         },
       })
@@ -239,27 +304,56 @@ export function validateContainer(
         name: {
           presence: true,
           type: 'string',
+          format: {
+            pattern: ENV_VAR_NAME_PATTERN,
+            message:
+              'of environment variable must only contain letters, digits, _, -, . and not start with a digit',
+          },
         },
         value: {
           type: 'string',
         },
         fromSecret: {
           type: 'string',
+          format: {
+            pattern: DATA_KEY_PATTERN,
+            message: 'must be a valid secret key (letters, digits, _, -, .)',
+          },
         },
         fromConfig: {
           type: 'string',
+          format: {
+            pattern: DATA_KEY_PATTERN,
+            message:
+              'must be a valid config map key (letters, digits, _, -, .)',
+          },
         },
       })
       if (envVarErrors) validationErrors = validationErrors.concat(envVarErrors)
+      // make-container lets fromSecret win silently — both sources on
+      // one variable is always a configuration mistake
+      if (envVar.fromSecret != null && envVar.fromConfig != null) {
+        validationErrors.push({
+          environment: [
+            `'${envVar.name}' cannot set both fromSecret and fromConfig`,
+          ],
+        })
+      }
     }
   }
 
   if (Array.isArray(container.volumeMounts)) {
+    // Kubernetes rejects two mounts on the same path within a container
+    const mountPaths = new Set()
     for (const volumeMount of container.volumeMounts) {
       const volumeMountErrors = validate(volumeMount, {
         name: {
           presence: true,
           type: 'string',
+          length: {
+            maximum: 63,
+            message: 'of volume mount must be at most 63 characters',
+          },
           format: {
             pattern:
               '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*',
@@ -285,6 +379,14 @@ export function validateContainer(
       })
       if (volumeMountErrors)
         validationErrors = validationErrors.concat(volumeMountErrors)
+      if (typeof volumeMount.mountPath === 'string') {
+        if (mountPaths.has(volumeMount.mountPath)) {
+          validationErrors.push({
+            volumeMounts: [`duplicate mountPath '${volumeMount.mountPath}'`],
+          })
+        }
+        mountPaths.add(volumeMount.mountPath)
+      }
     }
   }
 

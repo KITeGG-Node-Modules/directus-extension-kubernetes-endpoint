@@ -20,6 +20,23 @@ export function getDeploymentName(name) {
   return `sd-${nameSlug}`
 }
 
+// Kubernetes DNS-1123 label: lowercase alphanumerics and '-', 1-63
+// characters, starting and ending with an alphanumeric
+const DNS1123_LABEL_PATTERN = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/
+
+/**
+ * Check a generated resource name against the DNS-1123 label rules the
+ * API server enforces for StatefulSet/Service names — slugified ids can
+ * still come out empty or with stray dashes.
+ */
+export function isDns1123Label(name) {
+  return (
+    typeof name === 'string' &&
+    name.length <= 63 &&
+    DNS1123_LABEL_PATTERN.test(name)
+  )
+}
+
 /**
  * Parse the deployment's YAML data, mapping parse failures to a
  * client-facing 400 error instead of an unhandled 500.
