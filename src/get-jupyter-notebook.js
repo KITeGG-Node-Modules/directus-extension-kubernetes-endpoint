@@ -68,7 +68,7 @@ function folderUsage(summary, podName, claimName) {
  * from the kubelet stats summary, so it is only observable while the
  * notebook holds the claim mounted (a stopped notebook releases it).
  *
- * Degrades instead of failing: without JUPYTERHUB_URL the response is
+ * Degrades instead of failing: without JUPYTERHUB_API_URL the response is
  * { available: false }; a hub user that never spawned yields
  * { running: false }; volume usage degrades to nulls without kubelet
  * access. Kubernetes errors (pod/PVC reads) propagate.

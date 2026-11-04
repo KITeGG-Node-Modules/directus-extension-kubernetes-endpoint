@@ -985,11 +985,10 @@ Notes:
   notebook holds the claim mounted** — a stopped notebook releases it,
   so a `running: false` response has `volume: null` (the folder and its
   configured 10 GiB capacity persist regardless).
-- Configuration: `JUPYTERHUB_URL` and `JUPYTERHUB_API_TOKEN` (same env
-  vars the jupyterhub endpoint extension uses); with `JUPYTERHUB_URL`
-  unset the endpoint answers `{ "available": false }` instead of
-  failing. The home mount path (default `/home/jovyan`) is
-  `JUPYTERHUB_HOME_MOUNT_PATH`.
+- Configuration: `JUPYTERHUB_API_URL` and `JUPYTERHUB_API_TOKEN`; with
+  `JUPYTERHUB_API_URL` unset the endpoint answers
+  `{ "available": false }` instead of failing. The home mount path
+  (default `/home/jovyan`) is `JUPYTERHUB_HOME_MOUNT_PATH`.
 - Kubernetes reads (pod, claim, kubelet summary) run in the jupyterhub
   namespace — the pod/kubelet rules of the `kitegg-directus-capacity`
   ClusterRole already cover them; `persistentvolumeclaims` `get`/`list`
