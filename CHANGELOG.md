@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- The kubelet stats summary is fetched with a direct HTTPS request to `/api/v1/nodes/<node>/proxy/stats/summary` instead of the generated client's node-proxy methods: the `?path=` query form is rejected by current API servers (NotFound) and the URL form percent-encodes the path segment (`stats%2Fsummary`), which the API server also does not serve — on clusters without the legacy query form the summary was therefore never reachable, silently nulling volume usage in `GET /kubernetes/jupyter` and the deployment stats endpoints. TLS material and the Authorization header are applied from the same KubeConfig the Kubernetes clients are built from, and the request carries a 10s timeout
+
 ### Added
 
 - `GET /kubernetes/jupyter`: the requesting user's Jupyter notebook state and user folder volume statistics. The JupyterHub username is resolved from the Directus user's Keycloak identity (hub usernames match Keycloak usernames — the mapping the reservations-watcher also relies on), so a user only ever sees their own notebook. The running/pending state comes from the JupyterHub API (`servers[''].ready`, which also yields the actual pod name — no KubeSpawner escaping guesswork); the folder volume's "max" comes from the claim's PVC status and "used"/"available" from the kubelet stats summary of the pod's node — usage is only observable while the notebook holds the claim mounted, so a stopped notebook reports `volume: null`. Configuration via `JUPYTERHUB_API_URL`/`JUPYTERHUB_API_TOKEN` (unset → `{ available: false }`); requires `persistentvolumeclaims` `get`/`list` in the `kitegg-directus-capacity` ClusterRole (added to `k8s/rbac.yaml`)

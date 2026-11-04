@@ -1,17 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { appsClient, coreClient, customClient } = vi.hoisted(() => ({
+const { appsClient, coreClient, customClient, summaryMock } = vi.hoisted(() => ({
   appsClient: {
     readNamespacedStatefulSet: vi.fn(),
   },
   coreClient: {
     listNamespacedPod: vi.fn(),
-    connectGetNodeProxy: vi.fn(),
-    connectGetNodeProxyWithPath: vi.fn(),
   },
   customClient: {
     listNamespacedCustomObject: vi.fn(),
   },
+  summaryMock: vi.fn(),
 }))
 
 vi.mock('../src/lib/get-kubernetes-client.js', () => ({
@@ -23,6 +22,12 @@ vi.mock('../src/lib/get-kubernetes-client.js', () => ({
     if (api?.prototype?.listNamespacedCustomObject) return customClient
     return coreClient
   },
+}))
+
+// the kubelet summary transport is mocked wholesale: the raw node-proxy
+// request is covered by kubelet-summary.test.js
+vi.mock('../src/lib/kubelet-summary.js', () => ({
+  getKubeletStatsSummary: summaryMock,
 }))
 
 import { getDeploymentStats } from '../src/get-deployment-stats.js'
@@ -66,9 +71,7 @@ function mockMetrics(items, available = true) {
 }
 
 function mockKubeletSummaries(byNode) {
-  coreClient.connectGetNodeProxy.mockImplementation(async (nodeName) => ({
-    body: byNode[nodeName],
-  }))
+  summaryMock.mockImplementation(async (_client, nodeName) => byNode[nodeName])
 }
 
 const POD = {
@@ -449,11 +452,9 @@ describe('getDeploymentStats', () => {
   it('degrades gracefully when the kubelet stats summary is unreachable', async () => {
     mockPods([POD])
     mockMetrics([METRIC])
-    const failure = Object.assign(new Error('connect ECONNREFUSED'), {
-      statusCode: 500,
-    })
-    coreClient.connectGetNodeProxy.mockRejectedValue(failure)
-    coreClient.connectGetNodeProxyWithPath.mockRejectedValue(failure)
+    summaryMock.mockRejectedValue(
+      Object.assign(new Error('connect ECONNREFUSED'), { statusCode: 500 })
+    )
 
     const stats = await getDeploymentStats({ id: '5' })
     expect(stats.volumeStatsAvailable).toBe(false)
@@ -467,11 +468,12 @@ describe('getDeploymentStats', () => {
   it('reports authorization failures on the stats summary as a warning', async () => {
     mockPods([POD])
     mockMetrics([METRIC])
-    const forbidden = Object.assign(new Error('forbidden'), {
-      statusCode: 403,
-      body: { code: 403, message: 'nodes/proxy is forbidden' },
-    })
-    coreClient.connectGetNodeProxy.mockRejectedValue(forbidden)
+    summaryMock.mockRejectedValue(
+      Object.assign(new Error('forbidden'), {
+        statusCode: 403,
+        body: { code: 403, message: 'nodes/proxy is forbidden' },
+      })
+    )
 
     const stats = await getDeploymentStats({ id: '5' })
     expect(stats.volumeStatsAvailable).toBe(false)
@@ -489,25 +491,10 @@ describe('getDeploymentStats', () => {
     mockKubeletSummaries({ 'worker-1': SUMMARY, 'worker-2': SUMMARY })
 
     await getDeploymentStats({ id: '5' })
-    expect(coreClient.connectGetNodeProxy).toHaveBeenCalledTimes(2)
-    expect(coreClient.connectGetNodeProxy.mock.calls.map((c) => c[0])).toEqual([
+    expect(summaryMock.mock.calls.map((c) => c[1])).toEqual([
       'worker-1',
       'worker-2',
     ])
-  })
-
-  it('falls back to the /proxy/{path} URL form for the stats summary', async () => {
-    mockPods([POD])
-    mockMetrics([METRIC])
-    coreClient.connectGetNodeProxy.mockRejectedValue(new Error('unexpected'))
-    coreClient.connectGetNodeProxyWithPath.mockResolvedValue({ body: SUMMARY })
-
-    const stats = await getDeploymentStats({ id: '5' })
-    expect(stats.volumeStatsAvailable).toBe(true)
-    expect(coreClient.connectGetNodeProxyWithPath).toHaveBeenCalledWith(
-      'worker-1',
-      'stats/summary'
-    )
   })
 
   it('limits stats to the requested pod and returns null for foreign pod names', async () => {
