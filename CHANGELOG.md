@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- `GET /kubernetes/jupyter` reports the user folder claim even while the notebook is stopped: a stale pod reference in the hub state (pod deleted on stop) is tolerated, and the claim is resolved from the spawner's `claim-<hub username>` convention when the pod is gone. Usage (`usedBytes`) is genuinely unmeasurable without a mounting pod and stays null then, with no `usageWarning`; the running state and pod info are unchanged
+
 - The kubelet stats summary is fetched with a direct HTTPS request to `/api/v1/nodes/<node>/proxy/stats/summary` instead of the generated client's node-proxy methods: the `?path=` query form is rejected by current API servers (NotFound) and the URL form percent-encodes the path segment (`stats%2Fsummary`), which the API server also does not serve — on clusters without the legacy query form the summary was therefore never reachable, silently nulling volume usage in `GET /kubernetes/jupyter` and the deployment stats endpoints. TLS material and the Authorization header are applied from the same KubeConfig the Kubernetes clients are built from, and the request carries a 10s timeout
 
 ### Added

@@ -8,6 +8,7 @@ import {
 } from './lib/config.js'
 import { getJupyterHubUser } from './lib/jupyterhub.js'
 import { getKubeletStatsSummary } from './lib/kubelet-summary.js'
+import { isNotFound } from './lib/is-not-found.js'
 import { parseQuantity } from './lib/quantity.js'
 
 /**
@@ -44,7 +45,12 @@ function folderUsage(summary, podName, claimName) {
     availableBytes: null,
     usageWarning: null,
   }
-  if (!summary || !claimName) return result
+  if (!claimName) return result
+  if (!podName) {
+    // the notebook is stopped — the claim is not mounted anywhere, so
+    // its usage is genuinely not measurable (not a warning)
+    return result
+  }
   if (!summary) {
     result.usageWarning = 'kubelet_stats_unavailable'
     return result
@@ -112,14 +118,20 @@ export async function getJupyterNotebook(username) {
   const coreClient = getKubernetesClient(jupyterhubNamespace)
   let pod = null
   if (podName) {
-    const { body } = await coreClient.readNamespacedPod(
-      podName,
-      jupyterhubNamespace
-    )
-    pod = body
+    try {
+      const { body } = await coreClient.readNamespacedPod(
+        podName,
+        jupyterhubNamespace
+      )
+      pod = body
+    } catch (err) {
+      // a stopped notebook leaves stale pod state in the hub — the read
+      // 404s and the pod is simply gone; other errors propagate
+      if (!isNotFound(err)) throw err
+    }
   }
 
-  const claimName = pod ? findUserFolderClaim(pod) : null
+  let claimName = pod ? findUserFolderClaim(pod) : null
   let capacityBytes = null
   if (claimName) {
     const { body: claim } =
@@ -128,6 +140,23 @@ export async function getJupyterNotebook(username) {
         jupyterhubNamespace
       )
     capacityBytes = parseQuantity(claim.status?.capacity?.storage)
+  } else {
+    // The claim outlives the notebook: fall back to the spawner's
+    // claim-<hub username> convention so the folder usage display works
+    // while the notebook is stopped (capacity from the PVC status, usage
+    // not measurable without the kubelet entry of a mounting pod).
+    // A 404 means this user has no claim — volume stays null.
+    try {
+      const { body: claim } =
+        await coreClient.readNamespacedPersistentVolumeClaim(
+          `claim-${hubUser.name}`,
+          jupyterhubNamespace
+        )
+      claimName = `claim-${hubUser.name}`
+      capacityBytes = parseQuantity(claim.status?.capacity?.storage)
+    } catch (err) {
+      if (!isNotFound(err)) throw err
+    }
   }
 
   let summary = null
@@ -168,7 +197,9 @@ export async function getJupyterNotebook(username) {
       ? {
           claimName,
           capacityBytes,
-          ...folderUsage(summary, pod.metadata.name, claimName),
+          // usage is only measurable while a pod mounts the claim — a
+          // stopped notebook (pod null) reports nulls without a warning
+          ...folderUsage(summary, pod?.metadata?.name ?? null, claimName),
           ...(summaryError
             ? {
                 usageWarning: `kubelet_stats_unavailable: ${

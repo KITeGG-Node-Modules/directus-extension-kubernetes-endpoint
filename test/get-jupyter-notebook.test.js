@@ -162,15 +162,61 @@ describe('getJupyterNotebook', () => {
     )
   })
 
-  it('reports a not-running notebook without volume stats', async () => {
-    // a stopped server is absent from the `servers` map
+  it('reports a not-running notebook with the persisted claim capacity', async () => {
+    // a stopped server is absent from the `servers` map — the hub state
+    // stays, so the claim outlives the notebook and is reported from the
+    // spawner's claim-<username> convention (usage not measurable)
     mockHubUser({ name: 'john', servers: {} })
 
     const notebook = await getJupyterNotebook('john')
     expect(notebook.running).toBe(false)
     expect(notebook.pod).toBeNull()
-    expect(notebook.volume).toBeNull()
+    expect(notebook.volume).toEqual({
+      claimName: 'claim-john',
+      capacityBytes: 10 * 1024 ** 3,
+      usedBytes: null,
+      availableBytes: null,
+      usageWarning: null,
+    })
     expect(coreClient.readNamespacedPod).not.toHaveBeenCalled()
+    expect(coreClient.readNamespacedPersistentVolumeClaim).toHaveBeenCalledWith(
+      'claim-john',
+      'jupyterhub'
+    )
+  })
+
+  it('tolerates a stale pod reference after the notebook stopped', async () => {
+    // the hub still names the pod, but it was deleted on stop
+    const notFound = Object.assign(
+      new Error('pods "jupyter-john" not found'),
+      { statusCode: 404, body: { code: 404, reason: 'NotFound' } }
+    )
+    coreClient.readNamespacedPod.mockRejectedValue(notFound)
+    mockHubUser({
+      name: 'john',
+      servers: {
+        '': { ready: false, pending: null, state: { pod_name: 'jupyter-john' } },
+      },
+    })
+
+    const notebook = await getJupyterNotebook('john')
+    expect(notebook.running).toBe(false)
+    expect(notebook.pod).toBeNull()
+    expect(notebook.volume.claimName).toBe('claim-john')
+    expect(notebook.volume.usedBytes).toBeNull()
+    expect(notebook.volume.usageWarning).toBeNull()
+  })
+
+  it('reports no volume for a user without a claim', async () => {
+    const notFound = Object.assign(
+      new Error('persistentvolumeclaims "claim-john" not found'),
+      { statusCode: 404, body: { code: 404, reason: 'NotFound' } }
+    )
+    coreClient.readNamespacedPersistentVolumeClaim.mockRejectedValue(notFound)
+    mockHubUser({ name: 'john', servers: {} })
+
+    const notebook = await getJupyterNotebook('john')
+    expect(notebook.volume).toBeNull()
   })
 
   it('reports a user the hub does not know as not running', async () => {
