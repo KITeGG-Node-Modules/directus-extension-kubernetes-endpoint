@@ -1,10 +1,43 @@
 // SPDX-License-Identifier: EUPL-1.2
 import http from 'node:http'
 import https from 'node:https'
+import fs from 'node:fs'
 import { getKubeConfig } from './get-kubernetes-client.js'
 
 const KUBELET_STATS_SUMMARY_PATH = 'stats/summary'
 const REQUEST_TIMEOUT_MS = 10_000
+
+/**
+ * Applies the KubeConfig's TLS material and Authorization header to an
+ * https.request options object. The method name differs between
+ * @kubernetes/client-node versions (0.18: applytoHTTPSOptions, 0.20+:
+ * applyToHTTPSOptions) — whichever is present is used, with a manual
+ * application as the last resort.
+ */
+async function applyKubeConfigToRequest(kc, options) {
+  const apply =
+    kc.applyToHTTPSOptions?.bind(kc) ?? kc.applytoHTTPSOptions?.bind(kc)
+  if (apply) {
+    await apply(options)
+    return
+  }
+  const cluster = kc.getCurrentCluster()
+  const user = kc.getCurrentUser()
+  if (cluster?.skipTLSVerify) {
+    options.rejectUnauthorized = false
+  }
+  const fromFileOrData = (file, data) =>
+    file ? fs.readFileSync(file) : data ? Buffer.from(data, 'base64') : null
+  const ca = fromFileOrData(cluster?.caFile, cluster?.caData)
+  if (ca) options.ca = ca
+  const cert = fromFileOrData(user?.certFile, user?.certData)
+  if (cert) options.cert = cert
+  const key = fromFileOrData(user?.keyFile, user?.keyData)
+  if (key) options.key = key
+  if (user?.token) {
+    options.headers.Authorization = `Bearer ${user.token}`
+  }
+}
 
 /**
  * The kubelet's stats summary for one node, fetched through the API
@@ -51,7 +84,7 @@ export async function getKubeletStatsSummary(coreClient, nodeName) {
   }
   // ca / client cert / key / rejectUnauthorized / Authorization header —
   // exactly what the generated clients would send
-  await kc.applytoHTTPSOptions(options)
+  await applyKubeConfigToRequest(kc, options)
 
   const body = await new Promise((resolve, reject) => {
     const request = (isHttps ? https : http).request(options, (response) => {
