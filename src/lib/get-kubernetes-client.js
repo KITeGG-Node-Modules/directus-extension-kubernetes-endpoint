@@ -5,5 +5,5 @@
 // relative import sites across the extension untouched.
 export {
   getKubeConfig,
-  getKubernetesClient
+  getKubernetesClient,
 } from 'kitegg-directus-extension-common'
