@@ -736,7 +736,13 @@ An example output:
           "utilizationPercent": 87,
           "memoryBytes": 4294967296
         }
-      ]
+      ],
+      "network": {
+        "receiveBytesPerSecond": 12800,
+        "transmitBytesPerSecond": 3584,
+        "receiveBytesTotal": 1048576,
+        "transmitBytesTotal": 524288
+      }
     }
   ]
 }
@@ -760,6 +766,13 @@ Notes:
   not exposed. `gpuMetricsAvailable` is `false` when the Prometheus
   queries fail or dcgm-exporter is not deployed, or when the exporter
   lacks pod mapping; GPU-less deployments simply have an empty `gpus`.
+- `network` carries the pod's inbound/outbound traffic from cAdvisor
+  metrics (instant Prometheus queries): transfer rates in bytes/s
+  (`receiveBytesPerSecond`/`transmitBytesPerSecond`, rate over a 5m
+  window) plus the cumulative counters since pod start
+  (`receiveBytesTotal`/`transmitBytesTotal`). `networkMetricsAvailable`
+  is `false` when the Prometheus queries fail; pods without scrape data
+  yet have null values.
 - The sources degrade independently and never fail the endpoint:
   without a metrics-server `metricsAvailable` is `false` and usage is
   `null`; when the kubelet stats summary cannot be fetched (e.g. the
@@ -840,6 +853,20 @@ An example output:
         [1794180300, 4294967296]
       ]
     }
+  ],
+  "networkMetricsAvailable": true,
+  "networks": [
+    {
+      "pod": "sd-1234-0",
+      "receiveBytesPerSecond": [
+        [1794180000, 12800],
+        [1794180300, 13000]
+      ],
+      "transmitBytesPerSecond": [
+        [1794180000, 3584],
+        [1794180300, 3400]
+      ]
+    }
   ]
 }
 ```
@@ -848,7 +875,7 @@ Notes:
 
 - Series values are `[unix timestamp (s), value]` pairs; CPU is in
   cores, memory and volume sizes in bytes, GPU utilization in percent
-  (0-100) and GPU framebuffer usage in bytes.
+  (0-100) and GPU framebuffer usage in bytes, network rates in bytes/s.
 - GPU time series come from dcgm-exporter metrics (`DCGM_FI_DEV_GPU_UTIL`,
   framebuffer `DCGM_FI_DEV_FB_USED`), one series per GPU device and
   attributed to pods via the exporter's kubernetes pod mapping. On
@@ -856,8 +883,13 @@ Notes:
   `DCGM_FI_PROF_GR_ENGINE_ACTIVE` (×100) when the whole-GPU metric is
   not exposed. `gpuMetricsAvailable` is `false` when dcgm-exporter is
   not deployed (or exposes no data for the deployment) — `gpus` is then
-  empty while CPU/memory/volume series continue. GPU series are grouped
-  by device, not aggregated, and carry the owning pod.
+  empty while the CPU/memory/volume series continue. GPU series are
+  grouped by device, not aggregated, and carry the owning pod.
+- Network time series (`networks`) are per-pod transfer rates
+  (`rate(container_network_receive_bytes_total)` /
+  `container_network_transmit_bytes_total`, summed per pod), so a
+  series also ends when its pod is removed.
+  `networkMetricsAvailable` is `false` when the queries return no data.
 - Container series are aggregated per container name AND replica pod
   (`sum by (container, pod)`): a multi-container pod shows one series
   per container, a multi-replica deployment one series per replica, so

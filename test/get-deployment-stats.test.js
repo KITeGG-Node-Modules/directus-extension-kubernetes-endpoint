@@ -236,9 +236,74 @@ describe('getDeploymentStats', () => {
     ])
     // the DCGM queries are scoped to the deployment's pods (backslash
     // doubled for the PromQL string literal, see lib/prometheus.js)
-    const gpuQuery = new URL(calls[0]).searchParams.get('query')
-    expect(gpuQuery).toContain('DCGM_FI_DEV_GPU_UTIL')
+    const gpuQuery = calls
+      .map((url) => new URL(url).searchParams.get('query'))
+      .find((query) => query.includes('DCGM_FI_DEV_GPU_UTIL'))
     expect(gpuQuery).toContain('pod=~"^sd-5-\\\\d+$"')
+  })
+
+  it('reports current network I/O per pod from cAdvisor instant queries', async () => {
+    mockPods([POD])
+    mockMetrics([METRIC])
+    mockKubeletSummaries({ 'worker-1': SUMMARY })
+    const calls = []
+    fetchMock.mockImplementation(async (url) => {
+      calls.push(url)
+      const query = new URL(url).searchParams.get('query')
+      const rate = query.includes('rate(container_network_')
+      const receive = query.includes('container_network_receive_bytes_total')
+      // rates: 12.5 KiB/s in, 3.5 KiB/s out; totals: 1 MiB in, 0.5 MiB out
+      const value = rate
+        ? receive
+          ? '12800'
+          : '3584'
+        : receive
+          ? '1048576'
+          : '524288'
+      const result = query.includes('container_network_')
+        ? [{ metric: { pod: 'sd-5-0' }, value: [1794180000, String(value)] }]
+        : []
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          status: 'success',
+          data: { resultType: 'vector', result },
+        }),
+      }
+    })
+
+    const stats = await getDeploymentStats({ id: '5' })
+    expect(stats.networkMetricsAvailable).toBe(true)
+    expect(stats.pods[0].network).toEqual({
+      receiveBytesPerSecond: 12800,
+      transmitBytesPerSecond: 3584,
+      receiveBytesTotal: 1048576,
+      transmitBytesTotal: 524288,
+    })
+    // the network queries are scoped to the deployment's pods and rate
+    // over a 5m window
+    const rateQuery = calls
+      .map((url) => new URL(url).searchParams.get('query'))
+      .find((query) => query.includes('rate(container_network_receive'))
+    expect(rateQuery).toContain(
+      'sum by (pod) (rate(container_network_receive_bytes_total{pod=~"^sd-5-\\\\d+$"}[300s]))'
+    )
+  })
+
+  it('degrades network usage silently when Prometheus is unreachable', async () => {
+    mockPods([POD])
+    mockMetrics([METRIC])
+    mockKubeletSummaries({ 'worker-1': SUMMARY })
+
+    const stats = await getDeploymentStats({ id: '5' })
+    expect(stats.networkMetricsAvailable).toBe(false)
+    expect(stats.pods[0].network).toEqual({
+      receiveBytesPerSecond: null,
+      transmitBytesPerSecond: null,
+      receiveBytesTotal: null,
+      transmitBytesTotal: null,
+    })
   })
 
   it('falls back to the MIG profile metric when GPU_UTIL is absent', async () => {

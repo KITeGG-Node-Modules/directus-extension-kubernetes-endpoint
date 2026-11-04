@@ -2,6 +2,10 @@ import { getDeploymentName, statefulSetPodSelector } from './lib/util.js'
 import { prometheusUrl, servicesNamespace } from './lib/config.js'
 import { prometheusQuery, promqlString } from './lib/prometheus.js'
 import { collectGpuDevices, gpuDeviceQueries } from './lib/gpu-metrics.js'
+import {
+  collectNetworkSeries,
+  networkRateQueries,
+} from './lib/network-metrics.js'
 
 // Durations ("30s", "5m", "1h", "7d") — the single-unit subset of the
 // Prometheus duration syntax, enough for range/step parameters
@@ -156,6 +160,16 @@ export async function getDeploymentStatsHistory(
         query,
       ])
     ),
+    // Pod network I/O per pod (cAdvisor); rates need the same window
+    // treatment as the CPU rate above
+    ...Object.fromEntries(
+      Object.entries(networkRateQueries(podSelector, rateWindow)).map(
+        ([name, query]) => [
+          `network${name[0].toUpperCase()}${name.slice(1)}`,
+          query,
+        ]
+      )
+    ),
   }
 
   const warnings = []
@@ -197,6 +211,10 @@ export async function getDeploymentStatsHistory(
     results.gpuProfileUtilization,
     results.gpuMemory
   )
+  const networkSeries = collectNetworkSeries(
+    results.networkReceiveRate,
+    results.networkTransmitRate
+  )
 
   const history = {
     available: true,
@@ -207,6 +225,9 @@ export async function getDeploymentStatsHistory(
     gpuMetricsAvailable:
       results.gpuUtilization.length > 0 ||
       results.gpuProfileUtilization.length > 0,
+    networkMetricsAvailable:
+      results.networkReceiveRate.length > 0 ||
+      results.networkTransmitRate.length > 0,
     containers: containerKeys.map((key) => {
       // container and pod names are DNS labels — '|' never occurs in a key
       const separator = key.indexOf('|')
@@ -231,6 +252,11 @@ export async function getDeploymentStatsHistory(
       modelName: device.modelName,
       utilizationPercent: device.utilization,
       memoryBytes: device.memoryBytes,
+    })),
+    networks: networkSeries.map((entry) => ({
+      pod: entry.pod,
+      receiveBytesPerSecond: entry.receive,
+      transmitBytesPerSecond: entry.transmit,
     })),
   }
   if (warnings.length) {

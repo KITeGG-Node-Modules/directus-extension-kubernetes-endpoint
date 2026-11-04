@@ -10,6 +10,10 @@ import {
   gpuDeviceQueries,
   latestSample,
 } from './lib/gpu-metrics.js'
+import {
+  collectNetworkSeries,
+  networkCurrentQueries,
+} from './lib/network-metrics.js'
 
 const METRICS_API_GROUP = 'metrics.k8s.io'
 const METRICS_API_VERSION = 'v1beta1'
@@ -209,6 +213,59 @@ async function getGpuUsage(podSelector) {
 }
 
 /**
+ * Current network I/O for the deployment's pods, from cAdvisor metrics
+ * via Prometheus instant queries (the kubelet stats summary carries no
+ * network counters). Rates are computed over a 5m window, totals are the
+ * cumulative counters. Degrades silently like the GPU part: without
+ * reachable Prometheus or scrape data the result is empty.
+ */
+async function getNetworkUsage(podSelector) {
+  if (!prometheusUrl) {
+    return { available: false, rates: [], totals: [] }
+  }
+  const queries = networkCurrentQueries(podSelector)
+  try {
+    const [receiveRate, transmitRate, receiveTotal, transmitTotal] =
+      await Promise.all([
+        prometheusQuery(prometheusUrl, '/api/v1/query', {
+          query: queries.receiveRate,
+        }),
+        prometheusQuery(prometheusUrl, '/api/v1/query', {
+          query: queries.transmitRate,
+        }),
+        prometheusQuery(prometheusUrl, '/api/v1/query', {
+          query: queries.receiveTotal,
+        }),
+        prometheusQuery(prometheusUrl, '/api/v1/query', {
+          query: queries.transmitTotal,
+        }),
+      ])
+    return {
+      available: true,
+      rates: collectNetworkSeries(receiveRate, transmitRate),
+      totals: collectNetworkSeries(receiveTotal, transmitTotal),
+    }
+  } catch {
+    return { available: false, rates: [], totals: [] }
+  }
+}
+
+/**
+ * Merge the rate and total series for one pod into the response's
+ * `network` block (nulls when Prometheus had no data for the pod).
+ */
+function networkForPod(networkUsage, podName) {
+  const rates = networkUsage.rates.find((n) => n.pod === podName)
+  const totals = networkUsage.totals.find((n) => n.pod === podName)
+  return {
+    receiveBytesPerSecond: latestSample(rates?.receive ?? []),
+    transmitBytesPerSecond: latestSample(rates?.transmit ?? []),
+    receiveBytesTotal: latestSample(totals?.receive ?? []),
+    transmitBytesTotal: latestSample(totals?.transmit ?? []),
+  }
+}
+
+/**
  * Current runtime statistics for a deployment's containers:
  *
  * - resource usage per container and pod, from the metrics-server API
@@ -254,18 +311,25 @@ export async function getDeploymentStats(deployment, podName = null) {
       .map((container) => [container.name, container.resources.limits])
   )
 
-  const [{ metrics, available: metricsAvailable }, summaries, gpuUsage] =
-    await Promise.all([
-      getPodMetrics(statefulSetName),
-      getKubeletSummaries(pods, coreClient),
-      // DCGM instant queries: current utilization/framebuffer per GPU
-      getGpuUsage(statefulSetPodSelector(statefulSetName, podName)),
-    ])
+  const [
+    { metrics, available: metricsAvailable },
+    summaries,
+    gpuUsage,
+    networkUsage,
+  ] = await Promise.all([
+    getPodMetrics(statefulSetName),
+    getKubeletSummaries(pods, coreClient),
+    // DCGM instant queries: current utilization/framebuffer per GPU
+    getGpuUsage(statefulSetPodSelector(statefulSetName, podName)),
+    // cAdvisor instant queries: current network I/O per pod
+    getNetworkUsage(statefulSetPodSelector(statefulSetName, podName)),
+  ])
 
   const result = {
     metricsAvailable,
     volumeStatsAvailable: summaries.available,
     gpuMetricsAvailable: gpuUsage.available,
+    networkMetricsAvailable: networkUsage.available,
     pods: pods.map((pod) => {
       const podMetric = metrics.get(pod.metadata.name)
       const summaryPodEntry = summaries.byPod.get(pod.metadata.name)
@@ -301,6 +365,7 @@ export async function getDeploymentStats(deployment, podName = null) {
             utilizationPercent: latestSample(device.utilization),
             memoryBytes: latestSample(device.memoryBytes),
           })),
+        network: networkForPod(networkUsage, pod.metadata.name),
       }
     }),
   }

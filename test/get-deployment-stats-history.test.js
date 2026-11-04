@@ -104,8 +104,9 @@ describe('getDeploymentStatsHistory', () => {
     expect(end - start).toBe(3600)
 
     // One request per query: cpu, memory, volume used/capacity,
-    // GPU utilization (whole-GPU + MIG profile fallback) and framebuffer
-    expect(fetchMock.mock.calls).toHaveLength(7)
+    // GPU utilization (whole-GPU + MIG profile fallback) + framebuffer,
+    // network receive/transmit rates
+    expect(fetchMock.mock.calls).toHaveLength(9)
     const queries = fetchMock.mock.calls.map((call) =>
       new URL(call[0]).searchParams.get('query')
     )
@@ -322,6 +323,67 @@ describe('getDeploymentStatsHistory', () => {
     expect(history.gpus[0].memoryBytes).toEqual([])
   })
 
+  it('reports network rate time series per pod', async () => {
+    fetchMock.mockImplementation(async (url) => {
+      const query = new URL(url).searchParams.get('query')
+      let result = []
+      if (query.includes('rate(container_network_receive_bytes_total')) {
+        result = [
+          {
+            metric: { pod: 'sd-5-0' },
+            values: [
+              [1794180000, '12800'],
+              [1794180300, '13000'],
+            ],
+          },
+        ]
+      } else if (
+        query.includes('rate(container_network_transmit_bytes_total')
+      ) {
+        result = [
+          {
+            metric: { pod: 'sd-5-0' },
+            values: [[1794180000, '3584']],
+          },
+        ]
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          status: 'success',
+          data: { resultType: 'matrix', result },
+        }),
+      }
+    })
+
+    const history = await getDeploymentStatsHistory(
+      { id: '5' },
+      { rangeSeconds: 3600 }
+    )
+    expect(history.available).toBe(true)
+    expect(history.networkMetricsAvailable).toBe(true)
+    expect(history.networks).toEqual([
+      {
+        pod: 'sd-5-0',
+        receiveBytesPerSecond: [
+          [1794180000, 12800],
+          [1794180300, 13000],
+        ],
+        transmitBytesPerSecond: [[1794180000, 3584]],
+      },
+    ])
+    // the network queries are scoped to the deployment's pods with the
+    // rate window matching the step treatment of the CPU rate
+    const queries = fetchMock.mock.calls.map((call) =>
+      new URL(call[0]).searchParams.get('query')
+    )
+    expect(queries[7]).toContain(
+      'sum by (pod) (rate(container_network_receive_bytes_total{pod=~"^sd-5-\\\\d+$"}[240s]))'
+    )
+    expect(queries[8]).toContain('container_network_transmit_bytes_total')
+  })
+
   it('rejects invalid ranges and steps with a 400-shaped error', async () => {
     await expect(
       getDeploymentStatsHistory({ id: '5' }, { rangeSeconds: null })
@@ -349,7 +411,7 @@ describe('getDeploymentStatsHistory', () => {
     )
     expect(history.available).toBe(false)
     expect(history.reason).toBe('prometheus_unavailable')
-    expect(history.warnings).toHaveLength(7)
+    expect(history.warnings).toHaveLength(9)
   })
 
   it('degrades when the Prometheus API reports an error', async () => {
