@@ -55,3 +55,16 @@ export const imageRegistryAllowlist = (() => {
     .filter(Boolean)
   return registries.includes('*') ? null : registries
 })()
+
+// Namespace the monitoring stack (Prometheus) runs in — the stats
+// history endpoint queries its HTTP API for time series
+export const prometheusNamespace =
+  process.env.PROMETHEUS_NAMESPACE || 'prometheus'
+
+// Base URL of the Prometheus HTTP API for the deployment stats history
+// endpoint. Defaults to the headless `prometheus-operated` service the
+// Prometheus Operator always creates next to the Prometheus CR; set
+// PROMETHEUS_URL='' to disable the history endpoint entirely.
+export const prometheusUrl =
+  process.env.PROMETHEUS_URL ??
+  `http://prometheus-operated.${prometheusNamespace}.svc:9090`

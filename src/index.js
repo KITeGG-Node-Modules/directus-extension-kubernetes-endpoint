@@ -6,6 +6,8 @@ import { getDeploymentsState } from './endpoints/get-deployments-state.js'
 import { restartDeployment } from './endpoints/restart-deployment.js'
 import { getPodLogs } from './endpoints/get-pod-logs.js'
 import { getDeploymentPodEvents } from './endpoints/get-pod-events.js'
+import { getDeploymentStatsRoute } from './endpoints/get-deployment-stats.js'
+import { getDeploymentStatsHistoryRoute } from './endpoints/get-deployment-stats-history.js'
 import { scaleDeployment } from './endpoints/scale-deployment.js'
 import { deleteDeploymentRoute } from './endpoints/delete-deployment.js'
 import { deleteDeploymentPod } from './endpoints/delete-pod.js'
@@ -45,6 +47,23 @@ export default {
     router.get(
       '/deployments/:id/events/:podName',
       baseRequestHandler(getDeploymentPodEvents, context)
+    )
+
+    router.get(
+      '/deployments/:id/stats',
+      baseRequestHandler(getDeploymentStatsRoute, context)
+    )
+
+    // /stats/history must be registered before /stats/:podName, or the
+    // param route would claim 'history' as a pod name
+    router.get(
+      '/deployments/:id/stats/history',
+      baseRequestHandler(getDeploymentStatsHistoryRoute, context)
+    )
+
+    router.get(
+      '/deployments/:id/stats/:podName',
+      baseRequestHandler(getDeploymentStatsRoute, context)
     )
 
     router.patch(

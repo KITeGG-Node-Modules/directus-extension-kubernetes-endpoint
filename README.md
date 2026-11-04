@@ -53,6 +53,7 @@ Required verbs per resource (within the services namespace):
 | `pods`                              | `list`, `delete`                                     | state/info/logs/events, delete pod                                       |
 | `pods/log`                          | `get`                                                | pod logs                                                                 |
 | `events.k8s.io/events`              | `get`, `list`                                        | pod events                                                               |
+| `metrics.k8s.io/pods`               | `get`, `list`                                        | deployment stats (container resource usage)                              |
 
 > **Note:** verbs are evaluated per resource; permissions on `statefulsets`
 > do **not** imply permissions on the `statefulsets/scale` subresource. A
@@ -61,9 +62,12 @@ Required verbs per resource (within the services namespace):
 > updates and deletion — while first-time deploys and all read endpoints
 > keep working.
 
-Additionally, `GET /kubernetes/capacity` reads cluster-scoped resources
-(nodes and pods across all namespaces) and needs a `ClusterRole` (included
-in `k8s/rbac.yaml`).
+Additionally, `GET /kubernetes/capacity` and the volume part of
+`GET /kubernetes/deployments/:id/stats` read cluster-scoped resources
+(nodes, pods across all namespaces and the node proxy for the kubelet
+stats summary) and need a `ClusterRole` (included in `k8s/rbac.yaml`).
+Note that `nodes/proxy` grants access to every kubelet endpoint (exec,
+logs, ...) — grant it only to trusted accounts.
 
 ### Network isolation
 
@@ -661,6 +665,213 @@ An example output:
   }
 ]
 ```
+
+### Getting statistics for a deployment
+
+To return current runtime statistics for a deployment's containers —
+resource usage (the `kubectl top` / kubetop data from the metrics-server
+API) and volume usage (PVC bytes and inodes as seen by the kubelet) —
+poll this endpoint:
+
+```
+GET /kubernetes/deployments/<deployment ID>/stats
+```
+
+To limit the response to a single pod:
+
+```
+GET /kubernetes/deployments/<deployment ID>/stats/<pod name>
+```
+
+Only pods belonging to this deployment can be queried; pod names from
+other deployments return a 404 response.
+
+An example output:
+
+```json
+{
+  "metricsAvailable": true,
+  "volumeStatsAvailable": true,
+  "pods": [
+    {
+      "name": "sd-1234-0",
+      "phase": "Running",
+      "node": "worker-1",
+      "usage": {
+        "cpuCores": 0.012,
+        "memoryBytes": 271261696,
+        "timestamp": "2026-11-04T14:00:00Z",
+        "window": "30s"
+      },
+      "containers": [
+        {
+          "name": "nginx",
+          "usage": {
+            "cpu": "12m",
+            "cpuCores": 0.012,
+            "memory": "258Mi",
+            "memoryBytes": 270600704
+          },
+          "limits": { "cpu": "4", "memory": "32Gi" }
+        }
+      ],
+      "volumes": [
+        {
+          "name": "mydata-sd-1234-0",
+          "claimName": "mydata-sd-1234-0",
+          "mountPaths": ["/mydata"],
+          "usedBytes": 1048576,
+          "capacityBytes": 1073741824,
+          "availableBytes": 1072693248,
+          "inodesUsed": 12,
+          "inodesTotal": 5242880,
+          "time": "2026-11-04T14:00:00Z"
+        }
+      ],
+      "gpus": [
+        {
+          "gpu": "0",
+          "uuid": "GPU-abc",
+          "modelName": "NVIDIA A100",
+          "utilizationPercent": 87,
+          "memoryBytes": 4294967296
+        }
+      ]
+    }
+  ]
+}
+```
+
+Notes:
+
+- Container `usage` carries the raw Kubernetes quantity strings (`cpu`,
+  `memory`, as `kubectl top` prints them) plus the parsed base values
+  (`cpuCores` in cores, `memoryBytes` in bytes). The pod-level `usage`
+  aggregates its containers.
+- `limits` are the resource limits the container was deployed with, so
+  clients can display usage against the granted capacity.
+- Volume statistics come from the kubelet stats summary of each pod's
+  node (via the API server's node proxy) — the only source of actual
+  bytes used, which the PVC status does not provide.
+- `gpus` carries current GPU usage from dcgm-exporter metrics (instant
+  Prometheus queries) — GPU utilization is invisible to the
+  metrics-server. On MIG-partitioned GPUs the utilization derives from
+  `DCGM_FI_PROF_GR_ENGINE_ACTIVE` (×100) when `DCGM_FI_DEV_GPU_UTIL` is
+  not exposed. `gpuMetricsAvailable` is `false` when the Prometheus
+  queries fail or dcgm-exporter is not deployed, or when the exporter
+  lacks pod mapping; GPU-less deployments simply have an empty `gpus`.
+- The sources degrade independently and never fail the endpoint:
+  without a metrics-server `metricsAvailable` is `false` and usage is
+  `null`; when the kubelet stats summary cannot be fetched (e.g. the
+  `nodes/proxy` RBAC has not been applied yet) `volumeStatsAvailable`
+  is `false` and `volumes` is empty, with the reason in `warnings`.
+
+### Getting usage time series for a deployment
+
+For usage charts over time, the deployment stats are also available as
+Prometheus time series. The endpoint queries the Prometheus instance
+that scrapes the `services` namespace (see
+[`k8s/prometheus-allow.yaml`](k8s/prometheus-allow.yaml)) with range
+queries — per-container CPU (`rate(container_cpu_usage_seconds_total)`,
+the same source `kubectl top` derives its samples from) and memory
+(`container_memory_working_set_bytes`, the metric the OOM killer is
+based on), plus per-claim volume usage (`kubelet_volume_stats_used_bytes`):
+
+```http
+GET /kubernetes/deployments/<deployment ID>/stats/history?range=1h&step=5m
+```
+
+Optional parameters:
+
+```text
+range=<duration>   # window ending now, 1s to 30d (default '1h')
+step=<duration>    # resolution, 15s to 15m (default: range/150, min 15s)
+pod=<pod name>     # pin the series to one pod instead of the whole set
+```
+
+An example output:
+
+```json
+{
+  "available": true,
+  "rangeSeconds": 3600,
+  "stepSeconds": 300,
+  "start": 1794180000,
+  "end": 1794183600,
+  "containers": [
+    {
+      "name": "nginx",
+      "cpuCores": [
+        [1794180000, 0.012],
+        [1794180300, 0.014]
+      ],
+      "memoryBytes": [
+        [1794180000, 270600704],
+        [1794180300, 271261696]
+      ]
+    }
+  ],
+  "volumes": [
+    {
+      "name": "mydata-sd-1234-0",
+      "usedBytes": [
+        [1794180000, 1048576],
+        [1794180300, 1048576]
+      ],
+      "capacityBytes": [
+        [1794180000, 1073741824],
+        [1794180300, 1073741824]
+      ]
+    }
+  ],
+  "gpuMetricsAvailable": true,
+  "gpus": [
+    {
+      "pod": "sd-1234-0",
+      "gpu": "0",
+      "uuid": "GPU-abc",
+      "modelName": "NVIDIA A100",
+      "utilizationPercent": [
+        [1794180000, 85],
+        [1794180300, 91]
+      ],
+      "memoryBytes": [
+        [1794180000, 4294967296],
+        [1794180300, 4294967296]
+      ]
+    }
+  ]
+}
+```
+
+Notes:
+
+- Series values are `[unix timestamp (s), value]` pairs; CPU is in
+  cores, memory and volume sizes in bytes, GPU utilization in percent
+  (0-100) and GPU framebuffer usage in bytes.
+- GPU time series come from dcgm-exporter metrics (`DCGM_FI_DEV_GPU_UTIL`,
+  framebuffer `DCGM_FI_DEV_FB_USED`), one series per GPU device and
+  attributed to pods via the exporter's kubernetes pod mapping. On
+  MIG-partitioned GPUs the utilization derives from
+  `DCGM_FI_PROF_GR_ENGINE_ACTIVE` (×100) when the whole-GPU metric is
+  not exposed. `gpuMetricsAvailable` is `false` when dcgm-exporter is
+  not deployed (or exposes no data for the deployment) — `gpus` is then
+  empty while CPU/memory/volume series continue. GPU series are grouped
+  by device, not aggregated, and carry the owning pod.
+- Series are aggregated by container name across the deployment's
+  replicas (sum), so they survive pod restarts and rescheduling; a
+  stale series ends where the pod was removed.
+- The endpoint needs no extra Kubernetes RBAC — the extension talks to
+  Prometheus' HTTP API directly. It targets
+  `http://prometheus-operated.<PROMETHEUS_NAMESPACE>.svc:9090`
+  (default namespace `prometheus`; override with `PROMETHEUS_URL`, or
+  disable the endpoint with `PROMETHEUS_URL=''`). The Directus pod must
+  be able to reach the prometheus namespace — with default-deny egress
+  policies in place for Directus, an exception for this path is
+  required.
+- Like the stats endpoint, history degrades instead of failing: without
+  a configured or reachable Prometheus the response is
+  `{ "available": false, ... }` with the reason in `reason`/`warnings`.
 
 ### Delete a deployment's pod
 

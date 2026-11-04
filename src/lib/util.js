@@ -123,3 +123,17 @@ export function isVolumeClaimOf(name, statefulSetName) {
   const index = typeof name === 'string' ? name.lastIndexOf(suffix) : -1
   return index > 0 && /^\d+$/.test(name.slice(index + suffix.length))
 }
+
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * Pod name regex for Prometheus label selectors over a StatefulSet's
+ * pods: <statefulSetName>-<ordinal>, optionally pinned to one pod.
+ */
+export function statefulSetPodSelector(statefulSetName, podName = null) {
+  return podName
+    ? `^${escapeRegex(podName)}$`
+    : `^${escapeRegex(statefulSetName)}-\\d+$`
+}

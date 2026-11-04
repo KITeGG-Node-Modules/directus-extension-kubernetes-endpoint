@@ -52,6 +52,11 @@ rules:
   - apiGroups: ['events.k8s.io']
     resources: ['events']
     verbs: ['get', 'list']
+  # Deployment stats: container resource usage (kubectl top's source;
+  # a CustomResource served by metrics-server)
+  - apiGroups: ['metrics.k8s.io']
+    resources: ['pods']
+    verbs: ['get', 'list']
 ---
 # GET /kubernetes/capacity reads cluster-scoped resources: nodes and pods
 # across all namespaces. This requires a ClusterRole; without it only the
@@ -67,6 +72,14 @@ rules:
   - apiGroups: ['']
     resources: ['pods']
     verbs: ['get', 'list']
+  # Deployment stats: volume usage comes from the kubelet stats summary,
+  # read through the API server's node proxy
+  # (GET /api/v1/nodes/<node>/proxy/stats/summary). WARNING: nodes/proxy
+  # allows reaching every kubelet endpoint (exec, logs, ...) — grant it
+  # only to trusted accounts.
+  - apiGroups: ['']
+    resources: ['nodes/proxy']
+    verbs: ['get']
 ---
 # Bind the namespace role. Choose the subject matching the token:
 # - ServiceAccount (in-cluster token):
