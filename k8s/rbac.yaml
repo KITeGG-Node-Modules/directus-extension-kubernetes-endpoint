@@ -74,12 +74,19 @@ rules:
     verbs: ['get', 'list']
   # Deployment stats: volume usage comes from the kubelet stats summary,
   # read through the API server's node proxy
-  # (GET /api/v1/nodes/<node>/proxy/stats/summary). WARNING: nodes/proxy
-  # allows reaching every kubelet endpoint (exec, logs, ...) — grant it
-  # only to trusted accounts.
+  # (GET /api/v1/nodes/<node>/proxy/stats/summary). The notebook endpoint
+  # reads the user folder claims in the jupyterhub namespace. WARNING:
+  # nodes/proxy allows reaching every kubelet endpoint (exec, logs, ...)
+  # — grant it only to trusted accounts.
   - apiGroups: ['']
     resources: ['nodes/proxy']
     verbs: ['get']
+  # Notebook endpoint: the user folder claims live in the jupyterhub
+  # namespace (capacity from the PVC status; pod reads use the pods rule
+  # above)
+  - apiGroups: ['']
+    resources: ['persistentvolumeclaims']
+    verbs: ['get', 'list']
 ---
 # Bind the namespace role. Choose the subject matching the token:
 # - ServiceAccount (in-cluster token):

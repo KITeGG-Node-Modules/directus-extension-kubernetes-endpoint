@@ -16,10 +16,10 @@ import {
 } from './lib/network-metrics.js'
 import { GPU_RESOURCE_NAMES } from './lib/gpu-profiles.js'
 import { getContainerLimits } from './lib/container-limits.js'
+import { getKubeletStatsSummary } from './lib/kubelet-summary.js'
 
 const METRICS_API_GROUP = 'metrics.k8s.io'
 const METRICS_API_VERSION = 'v1beta1'
-const KUBELET_STATS_SUMMARY_PATH = 'stats/summary'
 
 /**
  * Container resource usage in both of the forms clients need: the raw
@@ -89,52 +89,6 @@ async function getPodMetrics(statefulSetName) {
     }
     throw err
   }
-}
-
-/**
- * The kubelet's stats summary for one node, fetched through the API
- * server's node proxy (the same data `kubectl get --raw
- * /api/v1/nodes/<node>/proxy/stats/summary` returns). This is the only
- * source of actual volume usage (PVC bytes/inodes as seen by the kubelet).
- *
- * The generated client offers two ways to address the proxy subresource:
- * the `?path=` query form (NodeProxyOptions) and the `/proxy/{path}` URL
- * form, which the client percent-encodes — encoding the path segment
- * mangles `stats/summary` into `stats%2Fsummary` on the wire, so the
- * query form is used first and the URL form kept as a fallback.
- * Returns undefined when the summary cannot be fetched (missing
- * nodes/proxy RBAC, unreachable kubelet, ...) — volume stats then
- * degrade to empty without failing the endpoint.
- */
-async function getKubeletStatsSummary(nodeName, coreClient) {
-  const summaryCandidates = [
-    () => coreClient.connectGetNodeProxy(nodeName, KUBELET_STATS_SUMMARY_PATH),
-    () =>
-      coreClient.connectGetNodeProxyWithPath(
-        nodeName,
-        KUBELET_STATS_SUMMARY_PATH
-      ),
-  ]
-  let lastError
-  for (const candidate of summaryCandidates) {
-    try {
-      const { body } = await candidate()
-      return typeof body === 'string' ? JSON.parse(body) : body
-    } catch (err) {
-      if (
-        isNotFound(err) ||
-        err?.statusCode === 403 ||
-        err?.body?.code === 403
-      ) {
-        // A missing node, an API-server RBAC denial or a kubelet
-        // authorization failure will not go away by trying another call
-        // shape — surface it to the caller instead of silently retrying
-        throw err
-      }
-      lastError = err
-    }
-  }
-  throw lastError
 }
 
 /**
@@ -427,7 +381,7 @@ async function getKubeletSummaries(pods, coreClient) {
   for (const nodeName of nodes) {
     let summary
     try {
-      summary = await getKubeletStatsSummary(nodeName, coreClient)
+      summary = await getKubeletStatsSummary(coreClient, nodeName)
     } catch (err) {
       available = false
       warnings.push(

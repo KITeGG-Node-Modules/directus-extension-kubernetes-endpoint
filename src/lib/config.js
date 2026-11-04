@@ -68,3 +68,15 @@ export const prometheusNamespace =
 export const prometheusUrl =
   process.env.PROMETHEUS_URL ??
   `http://prometheus-operated.${prometheusNamespace}.svc:9090`
+
+// JupyterHub API for the notebook endpoint (user server state incl. the
+// actual pod name). Same env vars the jupyterhub endpoint extension
+// uses; with JUPYTERHUB_URL unset the notebook endpoint reports
+// `available: false` instead of failing.
+export const jupyterhubUrl = process.env.JUPYTERHUB_URL ?? null
+export const jupyterhubApiToken = process.env.JUPYTERHUB_API_TOKEN ?? null
+
+// The path the user's home (the folder volume claim) is mounted at in
+// the singleuser pods — how the claim is identified in the pod spec
+export const jupyterhubHomeMountPath =
+  process.env.JUPYTERHUB_HOME_MOUNT_PATH || '/home/jovyan'

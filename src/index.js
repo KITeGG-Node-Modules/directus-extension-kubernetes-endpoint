@@ -8,6 +8,7 @@ import { getPodLogs } from './endpoints/get-pod-logs.js'
 import { getDeploymentPodEvents } from './endpoints/get-pod-events.js'
 import { getDeploymentStatsRoute } from './endpoints/get-deployment-stats.js'
 import { getDeploymentStatsHistoryRoute } from './endpoints/get-deployment-stats-history.js'
+import { getJupyterNotebookRoute } from './endpoints/get-jupyter-notebook.js'
 import { scaleDeployment } from './endpoints/scale-deployment.js'
 import { deleteDeploymentRoute } from './endpoints/delete-deployment.js'
 import { deleteDeploymentPod } from './endpoints/delete-pod.js'
@@ -53,6 +54,8 @@ export default {
       '/deployments/:id/stats',
       baseRequestHandler(getDeploymentStatsRoute, context)
     )
+
+    router.get('/jupyter', baseRequestHandler(getJupyterNotebookRoute, context))
 
     // /stats/history must be registered before /stats/:podName, or the
     // param route would claim 'history' as a pod name

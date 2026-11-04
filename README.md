@@ -740,9 +740,7 @@ An example output:
           "capacityBytes": 10737418240
         }
       ],
-      "gpuAllocation": [
-        { "resource": "nvidia.com/mig-1g.10gb", "count": 1 }
-      ],
+      "gpuAllocation": [{ "resource": "nvidia.com/mig-1g.10gb", "count": 1 }],
       "network": {
         "receiveBytesPerSecond": 12800,
         "transmitBytesPerSecond": 3584,
@@ -936,6 +934,66 @@ Notes:
 - Like the stats endpoint, history degrades instead of failing: without
   a configured or reachable Prometheus the response is
   `{ "available": false, ... }` with the reason in `reason`/`warnings`.
+
+### Jupyter notebook status and user folder volume
+
+To show the requesting user whether their Jupyter notebook is running,
+along with the usage of the notebook's user folder volume, call:
+
+```http
+GET /kubernetes/jupyter
+```
+
+The endpoint is scoped to the caller: the JupyterHub username is
+resolved from the Directus user's Keycloak identity (`external_identifier`
+→ Keycloak username — hub usernames match, the same mapping the
+reservations-watcher relies on). A user only ever sees their own
+notebook, admins included.
+
+An example output for a running notebook:
+
+```json
+{
+  "available": true,
+  "running": true,
+  "pending": null,
+  "server": null,
+  "pod": {
+    "name": "jupyter-john",
+    "phase": "Running",
+    "startedAt": "2026-11-05T09:00:00Z",
+    "ready": true
+  },
+  "volume": {
+    "claimName": "claim-john",
+    "capacityBytes": 10737418240,
+    "usedBytes": 123,
+    "availableBytes": 456
+  }
+}
+```
+
+Notes:
+
+- The running state comes from the JupyterHub API
+  (`servers[''].ready`), which also provides the actual pod name — no
+  username-escaping guesswork. `pending` mirrors the hub's spawn/stop
+  state; `server` is the (named) server, null for the default one.
+- `capacityBytes` ("max") comes from the user folder claim's PVC status;
+  `usedBytes`/`availableBytes` come from the kubelet stats summary of
+  the node the notebook runs on. **Usage is only observable while the
+  notebook holds the claim mounted** — a stopped notebook releases it,
+  so a `running: false` response has `volume: null` (the folder and its
+  configured 10 GiB capacity persist regardless).
+- Configuration: `JUPYTERHUB_URL` and `JUPYTERHUB_API_TOKEN` (same env
+  vars the jupyterhub endpoint extension uses); with `JUPYTERHUB_URL`
+  unset the endpoint answers `{ "available": false }` instead of
+  failing. The home mount path (default `/home/jovyan`) is
+  `JUPYTERHUB_HOME_MOUNT_PATH`.
+- Kubernetes reads (pod, claim, kubelet summary) run in the jupyterhub
+  namespace — the pod/kubelet rules of the `kitegg-directus-capacity`
+  ClusterRole already cover them; `persistentvolumeclaims` `get`/`list`
+  was added to it for the claim status (see [`k8s/rbac.yaml`](k8s/rbac.yaml)).
 
 ### Delete a deployment's pod
 
