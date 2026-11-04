@@ -141,6 +141,7 @@ describe('getJupyterNotebook', () => {
         capacityBytes: 10 * 1024 ** 3,
         usedBytes: 123,
         availableBytes: 456,
+        usageWarning: null,
       },
     })
 
@@ -220,13 +221,47 @@ describe('getJupyterNotebook', () => {
 
     const notebook = await getJupyterNotebook('john')
     expect(notebook.running).toBe(true)
-    // capacity ("max") still comes from the PVC status
+    // capacity ("max") still comes from the PVC status; the summary
+    // failure is surfaced as a warning instead of being swallowed
     expect(notebook.volume).toEqual({
       claimName: 'claim-john',
       capacityBytes: 10 * 1024 ** 3,
       usedBytes: null,
       availableBytes: null,
+      usageWarning: 'kubelet_stats_unavailable: connect ECONNREFUSED',
     })
+  })
+
+  it('warns when the pod is missing from the kubelet summary', async () => {
+    summaryMock.mockResolvedValue({ pods: [] })
+    mockHubUser({
+      name: 'john',
+      servers: {
+        '': { ready: true, pending: null, state: { pod_name: 'jupyter-john' } },
+      },
+    })
+
+    const notebook = await getJupyterNotebook('john')
+    expect(notebook.volume.usedBytes).toBeNull()
+    expect(notebook.volume.usageWarning).toBe(
+      'pod_not_in_summary: jupyter-john'
+    )
+  })
+
+  it('warns when the claim is missing from the kubelet summary', async () => {
+    summaryMock.mockResolvedValue({
+      pods: [{ podRef: { name: 'jupyter-john' }, volume: [] }],
+    })
+    mockHubUser({
+      name: 'john',
+      servers: {
+        '': { ready: true, pending: null, state: { pod_name: 'jupyter-john' } },
+      },
+    })
+
+    const notebook = await getJupyterNotebook('john')
+    expect(notebook.volume.usedBytes).toBeNull()
+    expect(notebook.volume.usageWarning).toBe('claim_not_in_summary: claim-john')
   })
 
   it('falls back to the first PVC when the home mount path is absent', async () => {

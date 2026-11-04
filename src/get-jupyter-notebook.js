@@ -42,14 +42,27 @@ function folderUsage(summary, podName, claimName) {
   const result = {
     usedBytes: null,
     availableBytes: null,
+    usageWarning: null,
   }
   if (!summary || !claimName) return result
+  if (!summary) {
+    result.usageWarning = 'kubelet_stats_unavailable'
+    return result
+  }
   const summaryPod = (summary.pods ?? []).find(
     (entry) => entry.podRef?.name === podName
   )
+  if (!summaryPod) {
+    result.usageWarning = `pod_not_in_summary: ${podName}`
+    return result
+  }
   const volume = (summaryPod?.volume ?? []).find(
     (entry) => entry.pvcRef?.name === claimName
   )
+  if (!volume) {
+    result.usageWarning = `claim_not_in_summary: ${claimName}`
+    return result
+  }
   result.usedBytes = volume?.usedBytes ?? null
   result.availableBytes = volume?.availableBytes ?? null
   return result
@@ -118,12 +131,16 @@ export async function getJupyterNotebook(username) {
   }
 
   let summary = null
+  let summaryError = null
   const nodeName = pod?.spec?.nodeName ?? null
   if (pod && nodeName) {
     try {
       summary = await getKubeletStatsSummary(coreClient, nodeName)
-    } catch {
-      // volume usage degrades to nulls — the running state is unaffected
+    } catch (err) {
+      // volume usage degrades to nulls — the running state is unaffected.
+      // The reason is surfaced in the response: a missing nodes/proxy
+      // RBAC grant is the usual cause and is fixable, not ignorable.
+      summaryError = err
     }
   }
 
@@ -152,6 +169,13 @@ export async function getJupyterNotebook(username) {
           claimName,
           capacityBytes,
           ...folderUsage(summary, pod.metadata.name, claimName),
+          ...(summaryError
+            ? {
+                usageWarning: `kubelet_stats_unavailable: ${
+                  summaryError?.message ?? String(summaryError)
+                }`,
+              }
+            : {}),
         }
       : null,
   }
