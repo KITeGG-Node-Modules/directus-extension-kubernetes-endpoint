@@ -3,6 +3,8 @@ import { NUMBER_UNITS } from './constants.js'
 import { validateContainer } from './validate-container.js'
 import { formatQuantity, parseQuantity } from './quantity.js'
 import { isSuffixedVolumeName } from './util.js'
+import { allowedVolumeAccessModes, storageClassName } from './config.js'
+import { CANONICAL_ACCESS_MODES } from './constants.js'
 
 const GIB = 1024 ** 3
 const MIB = 1024 ** 2
@@ -15,6 +17,13 @@ const VOLUME_SIZE_PATTERN = /^-?\d+(?:\.\d+)?(Mi|Gi)?$/
 
 const RFC1123_PATTERN =
   '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'
+
+// Access modes a volume claim may request: the storage class must
+// actually provision them, otherwise claims bind forever Pending (the
+// API server accepts any canonical mode regardless). '*' disables the
+// restriction and falls back to the canonical set
+const VOLUME_ACCESS_MODES = allowedVolumeAccessModes ?? CANONICAL_ACCESS_MODES
+const VOLUME_ACCESS_MODE_MESSAGE = `must be an access mode the storage class '${storageClassName}' provides: ${VOLUME_ACCESS_MODES.join(', ')}`
 
 export function validateDeployment(deployment, userGroups = []) {
   let validationErrors = []
@@ -140,18 +149,13 @@ export function validateDeployment(deployment, userGroups = []) {
                 'of volume must be a lowercase RFC1123 hostname (a-z,0-9,-,.)',
             },
           },
-          // access mode of the generated volume claim (make-volume-claim)
+          // access mode of the generated volume claim (make-volume-claim);
+          // restricted to what the configured storage class provisions
           type: {
             type: 'string',
             inclusion: {
-              within: [
-                'ReadWriteOnce',
-                'ReadOnlyMany',
-                'ReadWriteMany',
-                'ReadWriteOncePod',
-              ],
-              message:
-                'must be a valid access mode (ReadWriteOnce, ReadOnlyMany, ReadWriteMany, ReadWriteOncePod)',
+              within: VOLUME_ACCESS_MODES,
+              message: VOLUME_ACCESS_MODE_MESSAGE,
             },
           },
           // size and emptyDir.sizeLimit are validated below: they may be

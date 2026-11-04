@@ -1,4 +1,7 @@
-import { DEFAULT_IMAGE_REGISTRIES } from './constants.js'
+import {
+  DEFAULT_IMAGE_REGISTRIES,
+  DEFAULT_VOLUME_ACCESS_MODES,
+} from './constants.js'
 
 export const servicesNamespace = process.env.SERVICES_NAMESPACE || 'services'
 
@@ -24,6 +27,20 @@ export const enforceDeploymentOwnership =
 
 // Storage class for volume claim templates
 export const storageClassName = process.env.SERVICES_STORAGE_CLASS || 'longhorn'
+
+// Access modes user volume claims may request — the configured storage
+// class must actually provision them, otherwise claims stay Pending
+// forever. Comma-separated env override replaces the default;
+// ALLOWED_VOLUME_ACCESS_MODES='*' allows any canonical access mode.
+export const allowedVolumeAccessModes = (() => {
+  const raw = process.env.ALLOWED_VOLUME_ACCESS_MODES
+  if (raw == null) return DEFAULT_VOLUME_ACCESS_MODES
+  const modes = raw
+    .split(',')
+    .map((mode) => mode.trim())
+    .filter(Boolean)
+  return modes.includes('*') ? null : modes
+})()
 
 // Registries user containers may pull images from. Bare image names
 // ('pytorch/pytorch') imply docker.io. Comma-separated env override

@@ -294,6 +294,16 @@ Bare image names resolve per the Docker reference rules
 docker.io). Deployments referencing other registries are rejected at
 deploy time with the allowed list in the error message.
 
+Volume claims may only request access modes the configured storage class
+(`SERVICES_STORAGE_CLASS`, default `longhorn`) actually provisions —
+`DEFAULT_VOLUME_ACCESS_MODES` in `src/lib/constants.js`: `ReadWriteOnce`
+and `ReadWriteMany` (Longhorn serves RWX via NFS on the worker nodes).
+The env var `ALLOWED_VOLUME_ACCESS_MODES` (comma-separated) replaces the
+default list; `*` allows any canonical access mode. Requests outside the
+allowlist are rejected at deploy time: the API server would accept them,
+but the claim would bind forever `Pending` and the pod would never
+schedule.
+
 **Admin playbook:**
 
 - Audit what is deployed versus the defaults (expect these lists to
@@ -403,6 +413,8 @@ containers:
         # Optional volume params
         readOnly: true
         type: 'ReadWriteOnce' # If used across replicas or services, use 'ReadWriteMany'
+        # (restricted to the storage class's provisioned access modes;
+        # ALLOWED_VOLUME_ACCESS_MODES env overrides, '*' allows any)
 
 # The volumes section is only mandatory if mounts are specified (name has to match)
 volumes:

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { validateDeployment } from '../src/lib/validate-deployment.js'
 
 const validDeployment = {
@@ -152,7 +152,8 @@ describe('validateDeployment', () => {
     expect(errors.length).toBeGreaterThan(0)
   })
 
-  it('validates volume access modes', () => {
+  it('validates volume access modes against the storage class allowlist', () => {
+    // default allowlist (Longhorn): ReadWriteOnce and ReadWriteMany
     expect(
       validateDeployment({
         ...validDeployment,
@@ -164,5 +165,37 @@ describe('validateDeployment', () => {
       volumes: [{ name: 'data', size: '1Gi', type: 'ReadWriteOnceMany' }],
     })
     expect(errors.length).toBeGreaterThan(0)
+    // canonical but not provisioned by the default storage class
+    const unsupported = validateDeployment({
+      ...validDeployment,
+      volumes: [{ name: 'data', size: '1Gi', type: 'ReadOnlyMany' }],
+    })
+    expect(unsupported[0].type[0]).toContain("storage class 'longhorn'")
+    expect(unsupported[0].type[0]).toContain('ReadWriteOnce, ReadWriteMany')
+  })
+
+  it("allows any canonical access mode when the allowlist is '*'", async () => {
+    vi.stubEnv('ALLOWED_VOLUME_ACCESS_MODES', '*')
+    vi.resetModules()
+    try {
+      const { validateDeployment: validate } = await import(
+        '../src/lib/validate-deployment.js'
+      )
+      expect(
+        validate({
+          ...validDeployment,
+          volumes: [{ name: 'data', size: '1Gi', type: 'ReadOnlyMany' }],
+        })
+      ).toBeUndefined()
+      expect(
+        validate({
+          ...validDeployment,
+          volumes: [{ name: 'data', size: '1Gi', type: 'ReadWriteBogus' }],
+        }).length
+      ).toBeGreaterThan(0)
+    } finally {
+      vi.unstubAllEnvs()
+      vi.resetModules()
+    }
   })
 })

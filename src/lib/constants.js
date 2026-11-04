@@ -92,6 +92,24 @@ export const NUMBER_UNITS = {
 // Maximum replicas allowed per deployment (also enforced for ?scale=)
 export const MAX_REPLICAS = 16
 
+// The canonical Kubernetes PersistentVolumeClaim access modes. Volume
+// `type` values are validated against the configured allowlist
+// (DEFAULT_VOLUME_ACCESS_MODES / ALLOWED_VOLUME_ACCESS_MODES) and fall
+// back to this list when that check is disabled with '*'
+export const CANONICAL_ACCESS_MODES = [
+  'ReadWriteOnce',
+  'ReadOnlyMany',
+  'ReadWriteMany',
+  'ReadWriteOncePod',
+]
+
+// Access modes the default storage class actually provisions (Longhorn:
+// ReadWriteOnce always, ReadWriteMany with NFS on the worker nodes —
+// see the storage note in the README). Requests outside the allowlist
+// would bind forever Pending: the API server accepts any canonical mode,
+// the provisioner just never satisfies it
+export const DEFAULT_VOLUME_ACCESS_MODES = ['ReadWriteOnce', 'ReadWriteMany']
+
 // Registries user containers may pull images from by default (env:
 // IMAGE_REGISTRY_ALLOWLIST). nvcr.io for NVIDIA GPU container images;
 // mcr.microsoft.com for Microsoft's; a bare image name ('pytorch/pytorch')
